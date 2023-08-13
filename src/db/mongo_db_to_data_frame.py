@@ -22,12 +22,19 @@ class MongoDBToDataFrame:
         self.client = None
 
     # connect, convert_to_df, disconnect
-    def convert_to_df(self, database_name: str, collection_name: str, id_columns: List[str], disconnection: bool = True) -> pd.DataFrame:
+    def convert_to_df(self, database_name: str, collection_name: str, id_columns: List[str], fields: List[str] = None,
+                      disconnection: bool = True) -> pd.DataFrame:
         if self.client is None:
             self.connect()
         db = self.client[database_name]
         collection = db[collection_name]
-        df = pd.DataFrame(list(collection.find()))
+
+        # Если fields передан, создаем словарь проекции
+        projection = None
+        if fields:
+            projection = {field: 1 for field in fields}
+
+        df = pd.DataFrame(list(collection.find({}, projection)))
         df = self._convert_ids_to_uuid(df, id_columns)
         if disconnection:
             self.disconnect()
@@ -39,11 +46,14 @@ class MongoDBToDataFrame:
         def convert_to_uuid(id_value):
             if isinstance(id_value, uuid.UUID):
                 return id_value
-            else:
+            elif isinstance(id_value, bytes) and len(id_value) == 16:  # Добавил проверку на bytes
                 return uuid.UUID(bytes=id_value)
+            else:
+                return None  # или любое другое значение по умолчанию
 
         for col in id_columns:
             df[col] = df[col].apply(convert_to_uuid)
             df[col] = df[col].astype(str)
 
         return df
+

@@ -12,7 +12,7 @@ class Filereader():
 
     def get_df_from_csv(self, files: list):
         df_dict = {}
-        dir = '__venv\\files\\'
+        dir = 'files\\'
         for file in files:
             df_dict[file] = self.read_csv_in_chunks(dir + file)
         return df_dict
@@ -33,7 +33,7 @@ class FileReaderTest():
 
     def get_df_from_csv(self, files: list):
         df_dict = {}
-        dir = '__venv\\files\\'
+        dir = 'files\\'
         for file in files:
             df_dict[file] = self.read_csv_in_chunks(dir + file)
         return df_dict
