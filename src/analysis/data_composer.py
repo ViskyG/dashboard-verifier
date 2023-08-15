@@ -107,7 +107,7 @@ class DataComposer:
     @staticmethod
     def preprocess_data(df: pd.DataFrame, tests_to_sum=None, isTest=False, technical_information=False) -> pd.DataFrame:
         options = {
-        'is_test' : False,
+        'is_test' : True,
         'is_choice_tests': True,
         'is_filter_tests': False,
         'is_filter_Objects' : False,
@@ -731,27 +731,96 @@ class DataComposer:
 
     @staticmethod
     def enrich_results_with_education(results_df, answers_df):
+
+        # Создаем tqdm объект для отслеживания прогресса
+        tqdm.pandas(desc="Add education")
+
         # Создаём словарь для соответствия AnswerId и образования
         education_map = {
-            "1c95cb5b-d1f9-4345-a378-6d46ff8e890b": "Высшее",
-            "c2e934c1-e08a-4a40-97ad-2d7313b3ccda": "Не знаю",
-            "21bbf5c9-0ceb-419a-b7cd-b80b20012941": "Средне специальное"
+            "1c95cb5b-d1f9-4345-a378-6d46ff8e890b": (1, "Высшее"),
+            "c2e934c1-e08a-4a40-97ad-2d7313b3ccda": (2, "Не знаю"),
+            "21bbf5c9-0ceb-419a-b7cd-b80b20012941": (3, "Средне специальное")
         }
+        tests_with_education_question = ["Тест на интересы для Псковской области",
+                                         "Тест на интересы для ЯНАО",
+                                         "Тест для Псковской области",
+                                         "Тест для ЯНАО"
+                                         ]
 
-        # Сортируем ответы по дате (по убыванию), чтобы последний ответ был первым
-        answers_df = answers_df.sort_values(by='CreatedDate', ascending=False)
+        # Инициализируем словарь, чтобы отслеживать обработанные сессии
+        processed_sessions = {}
 
-        # Удаление дубликатов, оставляя только последний ответ (после сортировки)
-        answers_df = answers_df.drop_duplicates(subset=['SessionId', 'QuestionId'], keep='first')
+        # Фильтруем строки с нужными тестами
+        mask = results_df['ScreeningTestName'].isin(tests_with_education_question)
+        for idx, row in tqdm(results_df[mask].iterrows(), total=len(results_df[mask]), desc="Add education"):
+            session_id = row['SessionId']
+            if session_id not in processed_sessions:
+                answer_row = answers_df[answers_df['SessionId'] == session_id]
+                if not answer_row.empty:
+                    answer_id = answer_row.iloc[0]['AnswerId']
+                    if answer_id in education_map:
+                        transformed_value, value = education_map[answer_id]
+                        new_row = {
+                            'UserId': row['UserId'],
+                            'TransformedValue': transformed_value,
+                            'Value': value,
+                            'MinValue': 1,
+                            'MaxValue': 3,
+                            'SessionId': session_id,
+                            'ScreeningTestId': row['ScreeningTestId'],
+                            'VariantId': row['VariantId'],
+                            'City': row['City'],
+                            'CreatedDate': row['CreatedDate'],
+                            'Birthday': row['Birthday'],
+                            'FirstName': row['FirstName'],
+                            'MiddleName': row['MiddleName'],
+                            'LastName': row['LastName'],
+                            'PhoneNumber': row['PhoneNumber'],
+                            'SessionCreatedDate': row['SessionCreatedDate'],
+                            'SessionCompleted': row['SessionCompleted'],
+                            '_id': row['_id'],
+                            'ScreeningTestName': row['ScreeningTestName'],
+                            'VariantName': row['VariantName'],
+                            'UserHrid': row['UserHrid'],
+                            'ObjectType': "SPO/VO",
+                            'Name': "SPO/VO",
+                            'ClassName': row['ClassName'],
+                            'SchoolClassId': row['SchoolClassId'],
+                            'PupilId': row['PupilId'],
+                            'SchoolId': row['SchoolId'],
+                            'SchoolName': row['SchoolName'],
+                            'MunicipalityId': row['MunicipalityId'],
+                            'MunicipalityName': row['MunicipalityName']
+                        }
+                        processed_sessions[session_id] = new_row
 
-        # Создаём новую колонку "СПО/ВО" и заполняем её значениями из словаря, используя merge
-        merged_df = pd.merge(results_df, answers_df[['SessionId', 'AnswerId']], on='SessionId', how='left')
-        merged_df['СПО/ВО'] = merged_df['AnswerId'].map(education_map)
+        # Добавляем обработанные сессии к исходному датафрейму
+        results_df = results_df.append(list(processed_sessions.values()), ignore_index=True)
 
-        # Если вы не хотите сохранять столбец AnswerId в конечном результате, вы можете его удалить
-        merged_df.drop(columns=['AnswerId'], inplace=True)
-
-        return merged_df
+        return results_df
+    # @staticmethod
+    # def enrich_results_with_education(results_df, answers_df):
+    #     # Создаём словарь для соответствия AnswerId и образования
+    #     education_map = {
+    #         "1c95cb5b-d1f9-4345-a378-6d46ff8e890b": "Высшее",
+    #         "c2e934c1-e08a-4a40-97ad-2d7313b3ccda": "Не знаю",
+    #         "21bbf5c9-0ceb-419a-b7cd-b80b20012941": "Средне специальное"
+    #     }
+    #
+    #     # Сортируем ответы по дате (по убыванию), чтобы последний ответ был первым
+    #     answers_df = answers_df.sort_values(by='CreatedDate', ascending=False)
+    #
+    #     # Удаление дубликатов, оставляя только последний ответ (после сортировки)
+    #     answers_df = answers_df.drop_duplicates(subset=['SessionId', 'QuestionId'], keep='first')
+    #
+    #     # Создаём новую колонку "СПО/ВО" и заполняем её значениями из словаря, используя merge
+    #     merged_df = pd.merge(results_df, answers_df[['SessionId', 'AnswerId']], on='SessionId', how='left')
+    #     merged_df['СПО/ВО'] = merged_df['AnswerId'].map(education_map)
+    #
+    #     # Если вы не хотите сохранять столбец AnswerId в конечном результате, вы можете его удалить
+    #     merged_df.drop(columns=['AnswerId'], inplace=True)
+    #
+    #     return merged_df
 
     @staticmethod
     def enrich_results_with_municipality_info(result, profiles_df, municipalities_df):

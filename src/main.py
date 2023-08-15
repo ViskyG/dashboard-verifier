@@ -70,38 +70,26 @@ def write_results(output_filename, objects, results, threshold_value):
 
 # The main function is defined to control the execution of the code
 def main():
-    # Define the configuration file for MongoDB
-    config_file = "src/mongo_config.json"
-    # Initialize the MongoDBToDataFrame object with the config file
-    db_to_df = mongo_db_to_dt.MongoDBToDataFrame(config_file)
-
-    # Convert the "Schools" collection in the "Catalog" database to a DataFrame
-    school_df = db_to_df.convert_to_df("Catalog", "Schools", ["_id"])
-
-    # Convert the "Regions" collection in the "Catalog" database to a DataFrame
-    regions_df = db_to_df.convert_to_df("Catalog", "Regions", ["_id"])
-
-    # Convert the "Regions" collection in the "Catalog" database to a DataFrame
-    screening_tests_df = db_to_df.convert_to_df("Player", "ScreeningTests", ["_id"])
-
-
-
-    # Convert the "Municipalities" collection in the "Catalog" database to a DataFrame
-    municipalities_df = db_to_df.convert_to_df("Catalog", "Municipalities", ["_id"])
+    # # Define the configuration file for MongoDB
+    # config_file = "src/mongo_config.json"
+    # # Initialize the MongoDBToDataFrame object with the config file
+    # db_to_df = mongo_db_to_dt.MongoDBToDataFrame(config_file)
+    #
+    # # Convert the "Schools" collection in the "Catalog" database to a DataFrame
+    # school_df = db_to_df.convert_to_df("Catalog", "Schools", ["_id"])
+    #
+    # # Convert the "Regions" collection in the "Catalog" database to a DataFrame
+    # regions_df = db_to_df.convert_to_df("Catalog", "Regions", ["_id"])
+    #
+    # # Convert the "Regions" collection in the "Catalog" database to a DataFrame
+    # screening_tests_df = db_to_df.convert_to_df("Player", "ScreeningTests", ["_id"])
+    #
+    #
+    #
+    # # Convert the "Municipalities" collection in the "Catalog" database to a DataFrame
+    # municipalities_df = db_to_df.convert_to_df("Catalog", "Municipalities", ["_id"])
     output_dir = 'files'  # замените на ваш путь к директории
 
-    # Сохранение каждого DataFrame в свой pickle-файл
-    with open(os.path.join(output_dir, 'Schools.pkl'), 'wb') as file:
-        pickle.dump(school_df, file)
-
-    with open(os.path.join(output_dir, 'Regions.pkl'), 'wb') as file:
-        pickle.dump(regions_df, file)
-
-    with open(os.path.join(output_dir, 'ScreeningTests.pkl'), 'wb') as file:
-        pickle.dump(screening_tests_df, file)
-
-    with open(os.path.join(output_dir, 'Municipalities.pkl'), 'wb') as file:
-        pickle.dump(municipalities_df, file)
 
     with open(os.path.join(output_dir, 'Schools.pkl'), 'rb') as file:
         school_df = pickle.load(file)
@@ -166,10 +154,8 @@ def main():
     results_with_screening_test_df = \
         dc.DataComposer.enrich_results_with_screening_test_info(result_with_sessions_create_time_df, screening_tests_df)
 
-    results_with_with_education_df = dc.DataComposer.enrich_results_with_education(results_with_screening_test_df,
-                                                  dataframes['_UserAnswers__202308111406.csv'])
 
-    results_with_with_edishnal_info_df = dc.DataComposer.enrich_results_with_additional_info(results_with_with_education_df,
+    results_with_with_edishnal_info_df = dc.DataComposer.enrich_results_with_additional_info(results_with_screening_test_df,
                                                                                              dataframes['_PupilUsers__202308010610.csv'],
                                                                                              dataframes['_SchoolClasses__202308010732.csv'])
 
@@ -193,8 +179,11 @@ def main():
 
     enrich_results_with_is_deleted = dc.DataComposer.enrich_results_with_is_deleted(enriched_result, profile_df)
 
+    results_with_with_education_df = dc.DataComposer.enrich_results_with_education(enrich_results_with_is_deleted,
+                                                                                   dataframes[
+                                                                                       '_UserAnswers__202308111406.csv'])
     folder_name = 'yanao_2'
-    enriched_and_filtered_result = dc.DataComposer.filter_test_info(enrich_results_with_is_deleted, folder_name,
+    enriched_and_filtered_result = dc.DataComposer.filter_test_info(results_with_with_education_df, folder_name,
                                                                     dataframes['test_municipalities.csv'],
                                                                     dataframes['test_schools.csv'])
 
