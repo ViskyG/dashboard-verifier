@@ -1,3 +1,5 @@
+import pickle
+
 from db import mongo_db_to_data_frame as mongo_db_to_dt, filereader as fr
 from analysis import result_analyzer as ra
 from output import html_out_writer as hw
@@ -5,7 +7,7 @@ from analysis import data_validator as dv
 from analysis import data_composer as dc
 import os
 import pandas as pd
-
+import fastparquet
 
 def analyze_and_write_results_per_municipality_and_school(object_type, threshold_value, objects, result, base_output_dir):
     municipalities = result['MunicipalityName'].dropna().unique()
@@ -70,7 +72,6 @@ def write_results(output_filename, objects, results, threshold_value):
 def main():
     # Define the configuration file for MongoDB
     config_file = "src/mongo_config.json"
-
     # Initialize the MongoDBToDataFrame object with the config file
     db_to_df = mongo_db_to_dt.MongoDBToDataFrame(config_file)
 
@@ -82,14 +83,44 @@ def main():
 
     # Convert the "Regions" collection in the "Catalog" database to a DataFrame
     screening_tests_df = db_to_df.convert_to_df("Player", "ScreeningTests", ["_id"])
-    screening_tests_df = dc.DataComposer.compose_test_variants_dataframe(screening_tests_df)
+
+
 
     # Convert the "Municipalities" collection in the "Catalog" database to a DataFrame
     municipalities_df = db_to_df.convert_to_df("Catalog", "Municipalities", ["_id"])
+    output_dir = 'files'  # замените на ваш путь к директории
+
+    # Сохранение каждого DataFrame в свой pickle-файл
+    with open(os.path.join(output_dir, 'Schools.pkl'), 'wb') as file:
+        pickle.dump(school_df, file)
+
+    with open(os.path.join(output_dir, 'Regions.pkl'), 'wb') as file:
+        pickle.dump(regions_df, file)
+
+    with open(os.path.join(output_dir, 'ScreeningTests.pkl'), 'wb') as file:
+        pickle.dump(screening_tests_df, file)
+
+    with open(os.path.join(output_dir, 'Municipalities.pkl'), 'wb') as file:
+        pickle.dump(municipalities_df, file)
+
+    with open(os.path.join(output_dir, 'Schools.pkl'), 'rb') as file:
+        school_df = pickle.load(file)
+
+    with open(os.path.join(output_dir, 'Regions.pkl'), 'rb') as file:
+        regions_df = pickle.load(file)
+
+    with open(os.path.join(output_dir, 'ScreeningTests.pkl'), 'rb') as file:
+        screening_tests_df = pickle.load(file)
+
+    with open(os.path.join(output_dir, 'Municipalities.pkl'), 'rb') as file:
+        municipalities_df = pickle.load(file)
+
+
+    screening_tests_df = dc.DataComposer.compose_test_variants_dataframe(screening_tests_df)
 
     # List of CSV file names to be read
     files = [
-        '_pskovskaya_result_2.csv',
+        '_yanao_result_1.csv', #_yanao_result_1
         '_UserProfiles__202308041858.csv',
         '_SchoolClasses__202308010732.csv',
         'all_sessions.csv',
@@ -124,7 +155,7 @@ def main():
     threshold_value = 70.0
 
     validator = dv.DataValidator()
-    df_without_duplicates = validator.remove_duplicates_by_id(dataframes['_pskovskaya_result_2.csv'])
+    df_without_duplicates = validator.remove_duplicates_by_id(dataframes['_yanao_result_1.csv'])
 
     result_with_tech_info_df = dc.DataComposer.enrich_results_with_technical_info(df_without_duplicates,
                                                                                   dataframes['_UserProfiles_Pskov.csv'])
@@ -160,15 +191,20 @@ def main():
     enriched_result = dc.DataComposer.enrich_results_with_municipality_info(sc_enriched_result, profile_df,
                                                                             municipalities_df)
 
-    folder_name = 'pskov_2'
-    enriched_and_filtered_result = dc.DataComposer.filter_test_info(enriched_result, folder_name,
+    enrich_results_with_is_deleted = dc.DataComposer.enrich_results_with_is_deleted(enriched_result, profile_df)
+
+    folder_name = 'yanao_2'
+    enriched_and_filtered_result = dc.DataComposer.filter_test_info(enrich_results_with_is_deleted, folder_name,
                                                                     dataframes['test_municipalities.csv'],
                                                                     dataframes['test_schools.csv'])
 
 
 
-    tests_to_sum = [("Тест на способности для Псковской области_Стандартный вариант для всех",
-                     "Тест на интересы для Псковской области_Стандартный вариант для всех")]
+    tests_to_sum = [("Тест на способности для ЯНАО_Стандартный вариант для всех",
+                     "Тест на интересы для ЯНАО_Стандартный вариант для всех")]
+    #tests_to_sum = [("Тест на способности для Псковской области_Стандартный вариант для всех",
+    #                 "Тест на интересы для Псковской области_Стандартный вариант для всех")]
+
     dc.DataComposer.create_excel_from_dataframe(enriched_and_filtered_result, folder_name, tests_to_sum)
 
     composed_data = dc.DataComposer.compose_by_municipality_and_school(enriched_result)

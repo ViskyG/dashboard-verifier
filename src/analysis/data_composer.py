@@ -62,7 +62,7 @@ class DataComposer:
         return df_excluded
 
     @staticmethod
-    def filter_and_sort(df: pd.DataFrame, test_names: list = None) -> pd.DataFrame:
+    def choice_and_sort(df: pd.DataFrame, test_names: list = None) -> pd.DataFrame:
         """
         Фильтрует и сортирует DataFrame на основе заданных условий.
 
@@ -74,8 +74,8 @@ class DataComposer:
         - pd.DataFrame: Отфильтрованный и отсортированный DataFrame.
         """
 
-        if True:
-            test_names = ["Тест на способности для Псковской области", "Тест на интересы для Псковской области"]
+        #if True:
+        #    test_names = ["Тест на способности для Псковской области", "Тест на интересы для Псковской области"]
 
         if test_names:
             df_filtered = df[df['ScreeningTestName'].isin(test_names)]
@@ -90,9 +90,9 @@ class DataComposer:
     @staticmethod
     def generate_test_data(df):
         # Шаг 1: Выбор записей по условию
-        mask = df['ScreeningTestName'].isin(["Тест на способности для Псковской области",
-                                             "Тест на интересы для Псковской области"])
-        initial_selection = df[mask].head(30000)
+        #mask = df['ScreeningTestName'].isin(["Тест на способности для Псковской области",
+        #                                     "Тест на интересы для Псковской области"])
+        initial_selection = df.head(60000)
 
         # Шаг 2: Найти все записи с теми же значениями UserHrid и Name
         unique_users_and_names = initial_selection[['UserHrid', 'Name']].drop_duplicates()
@@ -106,6 +106,39 @@ class DataComposer:
 
     @staticmethod
     def preprocess_data(df: pd.DataFrame, tests_to_sum=None, isTest=False, technical_information=False) -> pd.DataFrame:
+        options = {
+        'is_test' : False,
+        'is_choice_tests': True,
+        'is_filter_tests': False,
+        'is_filter_Objects' : False,
+        'is_choice_Objects' : False,
+        'top_n_rows' : False,
+        'is_technical_information' : False,
+        'is_last_results' : True,
+        'is_separate_relults' : False,
+        'delete is_delete' : True,
+        'delete SchoolIsDeleted' : True
+        }
+
+        pskovskaya_oblast = {"Тест на способности для Псковской области",
+                             "Тест на интересы для Псковской области",
+                             "Тест для Псковской области"}
+
+        yanao = {"Тест на способности для ЯНАО",
+                 "Тест на интересы для ЯНАО",
+                 "Тест для ЯНАО"}
+
+        choice_tests = yanao
+
+
+        filter_tests = {}
+        filter_Objects = {}
+        choice_Objects = {"FieldDO"}
+        filter_top = 0
+
+
+
+
         """
         Предобработка данных: фильтрация, сортировка, исключение тестов, генерация тестовых данных.
 
@@ -119,22 +152,57 @@ class DataComposer:
         - pd.DataFrame: Обработанный DataFrame.
         """
 
+        if options['delete is_delete']:
+            print("delete is_delete = True")
+            print('before ', df.shape[0])
+            df = df[df['IsDeleted'] == False]
+            print('after ', df.shape[0])
+
+        if options['delete SchoolIsDeleted']:
+            print("delete SchoolIsDeleted = True")
+            print('before ', df.shape[0])
+            df = df[df['SchoolIsDeleted'] == False]
+            print('after ', df.shape[0])
+
         # Генерация тестовых данных, если требуется
-        if isTest:
-            print("test")
+        if options['is_test']:
+            print("is_test = True")
+            print('before ', df.shape[0])
             df = DataComposer.generate_test_data(df)
+            print('after ', df.shape[0])
 
-        # Исключение определенных тестов (метод должен быть реализован)
-        # if technical_information:
-        #     df = DataComposer.exclude_tests(df)
+        if options['is_filter_Objects']:
+            print("is_filter_Objects = True")
+            print('before ', df.shape[0])
+            df = DataComposer.filter_objects(df, filter_Objects)
+            print('after ', df.shape[0])
 
-        # Фильтрация и сортировка (метод должен быть реализован)
-        # df = DataComposer.filter_and_sort(df)
+        if options['is_choice_Objects']:
+            print("is_choice_Objects = True")
+            print('before ', df.shape[0])
+            df = DataComposer.choice_objects(df, choice_Objects)
+            print('after ', df.shape[0])
 
-        # Фильтрация последних результатов
-        df = DataComposer.filter_latest_results(df)
+        if options['is_choice_tests']:
+            print("is_choice_tests = True")
+            print('before ', df.shape[0])
+            df = DataComposer.choice_and_sort(df, test_names=choice_tests)
+            print('after ', df.shape[0])
 
-        return df
+        if options['is_filter_tests']:
+            print("is_filter_tests = True")
+            print('before ', df.shape[0])
+            df = DataComposer.exclude_tests(df)
+            print('after ', df.shape[0])
+
+        if options['is_last_results']:
+            print("is_last_results = True")
+            print('before ', df.shape[0])
+            df = DataComposer.filter_latest_results(df)
+            print('after ', df.shape[0])
+
+
+        return df, options
 
     @staticmethod
     def save_unique_counts_to_csv(unique_counts: pd.Series, folder_path: str) -> None:
@@ -190,30 +258,38 @@ class DataComposer:
 
 
     @staticmethod
-    def create_excel_from_dataframe(df, output_folder, tests_to_sum=None, isTest=False):
+    def create_excel_from_dataframe(df, output_folder, tests_to_sum=None):
+        print("Количество групп")
+        print(df.shape[0])
 
-        # Узнаем размер df
-        print("df.shape")
-        print(df.shape)
-        alternate_sum = "Тест для Псковской области_Стандартный вариант для всех"
+        equivalent = "Тест для ЯНАО_Стандартный вариант для всех"
+        #alternate_sum = "Тест для Псковской области_Стандартный вариант для всех"
 
-        df = DataComposer.preprocess_data(df, tests_to_sum=tests_to_sum, isTest=False)
-        DataComposer.create_excel_from_prepared_dataframe(df, output_folder, 'result_out', tests_to_sum, alternate_sum, isTest)
+        df, options = DataComposer.preprocess_data(df, tests_to_sum=tests_to_sum, isTest=False)
+        print(options)
+        print("Количество групп")
+        print(df.shape[0])
+        if options['is_separate_relults']:
 
-        # unique_user_counts, grouped_dfs = DataComposer.process_dataframe(df)
-        # DataComposer.save_unique_counts_to_csv(unique_user_counts, output_folder)
-        # legend = {name: i for i, name in enumerate(grouped_dfs.keys(), 1)}
-        #
-        # for test_variant, group_df in grouped_dfs.items():
-        #     # Используем номер комбинации из легенды для имени файла
-        #     file_name = f"combo_{legend[test_variant]}"
-        #     DataComposer.create_excel_from_prepared_dataframe(group_df, output_folder, file_name, tests_to_sum, isTest)
+            unique_user_counts, grouped_dfs = DataComposer.process_dataframe(df)
+            DataComposer.save_unique_counts_to_csv(unique_user_counts, output_folder)
+            legend = {name: i for i, name in enumerate(grouped_dfs.keys(), 1)}
 
+            for test_variant, group_df in grouped_dfs.items():
+                # Используем номер комбинации из легенды для имени файла
+                file_name = f"combo_{legend[test_variant]}"
+                DataComposer.create_excel_from_prepared_dataframe(group_df, output_folder, file_name, tests_to_sum,
+                                                                  equivalent=equivalent, options=options)
 
+        else:
+            DataComposer.create_excel_from_prepared_dataframe(df, output_folder, 'result_out', tests_to_sum,
+                                                              equivalent=equivalent,
+                                                              options=options)
     @staticmethod
-    def create_excel_from_prepared_dataframe(df, output_folder, file_name, tests_to_sum=None, alternate_sum=None, isTest=False):
+    def create_excel_from_prepared_dataframe(df, output_folder, file_name, tests_to_sum=None, alternate_sum=None, equivalent=None, options=None):
 
-        technical_information = False
+        print("Количество групп")
+        print(df.shape[0])
 
         if tests_to_sum is None:
             tests_to_sum = []
@@ -224,16 +300,17 @@ class DataComposer:
         for _, row in unique_tests.iterrows():
             test_name = f"{row['ScreeningTestName']}_{row['VariantName']}"
             columns.extend([test_name + '_TransformedValue', test_name + '_Value', test_name + '_MinValue',
-                            test_name + '_MaxValue'])
+                            test_name + '_MaxValue', test_name + '_Session_Date'])
 
         result_df = pd.DataFrame(columns=columns)
 
         def aggregate_tests(group):
             # if technical information is True then we need to add technical information to result_df
-            if technical_information:
+            if options['is_technical_information']:
                 data = {
                 #'UserId', 'City', 'CreatedDate', 'Birthday', 'FirstName', 'MiddleName', 'LastName', 'PhoneNumber'
                     'UserHrid': group['UserHrid'].iloc[0],
+                    'PupilId': group['PupilId'].iloc[0],
                     'UserId': group['UserId'].iloc[0],
                     'Name': group['Name'].iloc[0],
                     'ClassName': group['ClassName'].iloc[0],
@@ -247,11 +324,13 @@ class DataComposer:
                     'FirstName': group['FirstName'].iloc[0],
                     'MiddleName': group['MiddleName'].iloc[0],
                     'LastName': group['LastName'].iloc[0],
-                    'PhoneNumber': group['PhoneNumber'].iloc[0]
+                    'PhoneNumber': group['PhoneNumber'].iloc[0],
+                    'IsDeleted': group['IsDeleted'].iloc[0]
                 }
             else:
                 data = {
                     'UserHrid': group['UserHrid'].iloc[0],
+                    'PupilId': group['PupilId'].iloc[0],
                     'Name_Object': group['Name'].iloc[0],
                     'ClassName': group['ClassName'].iloc[0],
                     'СПО/ВО': group['СПО/ВО'].iloc[0],
@@ -265,6 +344,8 @@ class DataComposer:
             data.update({name + '_Value': val for name, val in zip(test_names, group['Value'])})
             data.update({name + '_MinValue': val for name, val in zip(test_names, group['MinValue'])})
             data.update({name + '_MaxValue': val for name, val in zip(test_names, group['MaxValue'])})
+            data.update(
+                {name + '_Session_Date': date for name, date in zip(test_names, group['SessionCreatedDate'])})
 
             return pd.Series(data)
 
@@ -273,7 +354,8 @@ class DataComposer:
 
         counter = 0
         result_data = []
-
+        print("Количество групп")
+        print(df.shape[0])
         # Применение функции к каждой группе
         for _, group in grouped:
             result_data.append(aggregate_tests(group))
@@ -287,13 +369,107 @@ class DataComposer:
         # Добавление столбцов для суммированных тестов (если это требуется)
         import numpy as np
 
-        counter = 0
+        def calculate_values_with_equivalent(result_df, test_pair, attr_dict, equivalent_test_name=None):
+            nan_mask_1 = result_df[test_pair[0] + '_Value'].isna()
+            nan_mask_2 = result_df[test_pair[1] + '_Value'].isna()
+            both_nan_mask = nan_mask_1 & nan_mask_2
+
+            sum_values = result_df[[test + '_Value' for test in test_pair]].sum(axis=1, skipna=True)
+            sum_min_values = result_df[[test + '_MinValue' for test in test_pair]].sum(axis=1, skipna=True)
+            sum_max_values = result_df[[test + '_MaxValue' for test in test_pair]].sum(axis=1, skipna=True)
+
+            sum_transformed_values = pd.Series(index=result_df.index)
+
+            if equivalent_test_name and equivalent_test_name + '_Value' in result_df.columns:
+                eq_date = result_df[equivalent_test_name + '_Session_Date']
+                pair_dates = result_df[[test + '_Session_Date' for test in test_pair]]
+                latest_test_date = pair_dates.max(axis=1)
+                use_equivalent_mask = (eq_date > latest_test_date) & ~eq_date.isna()
+
+                # Добавляем условие, чтобы использовать эквивалентную диагностику, если оба теста равны NaN
+                use_equivalent_mask |= both_nan_mask
+
+                # Если эквивалентный тест используется:
+                sum_values[use_equivalent_mask] = result_df[equivalent_test_name + '_Value'][use_equivalent_mask]
+                sum_min_values[use_equivalent_mask] = result_df[equivalent_test_name + '_MinValue'][use_equivalent_mask]
+                sum_max_values[use_equivalent_mask] = result_df[equivalent_test_name + '_MaxValue'][use_equivalent_mask]
+                sum_transformed_values[use_equivalent_mask] = result_df[equivalent_test_name + '_TransformedValue'][
+                    use_equivalent_mask]
+
+            both_tests_mask = ~nan_mask_1 & ~nan_mask_2
+            sum_transformed_values[both_tests_mask] = ((sum_values[both_tests_mask] - sum_min_values[
+                both_tests_mask]) * 100) / \
+                                                      (sum_max_values[both_tests_mask] - sum_min_values[
+                                                          both_tests_mask])
+
+            single_test_mask = nan_mask_1 ^ nan_mask_2
+            for i, mask in enumerate([nan_mask_1, nan_mask_2]):
+                current_mask = single_test_mask & ~mask
+                sum_values[current_mask] = result_df[test_pair[i] + '_Value'][current_mask].astype(str) + "!"
+                sum_min_values[current_mask] = result_df[test_pair[i] + '_MinValue'][current_mask].astype(str) + "!"
+                sum_max_values[current_mask] = result_df[test_pair[i] + '_MaxValue'][current_mask].astype(str) + "!"
+
+            sum_transformed_values_single = ((sum_values[single_test_mask].str.replace('!', '', regex=False).astype(
+                float) -
+                                              sum_min_values[single_test_mask].str.replace('!', '', regex=False).astype(
+                                                  float)) * 100) / \
+                                            (sum_max_values[single_test_mask].str.replace('!', '', regex=False).astype(
+                                                float) -
+                                             sum_min_values[single_test_mask].str.replace('!', '', regex=False).astype(
+                                                 float))
+            sum_transformed_values[single_test_mask] = sum_transformed_values_single.astype(str) + "!"
+
+            return sum_values, sum_min_values, sum_max_values, sum_transformed_values
+        def calculate_values_with_alternate(result_df, test_pair, attr_dict, alternate_sum=None):
+            nan_mask_1 = result_df[test_pair[0] + '_Value'].isna()
+            nan_mask_2 = result_df[test_pair[1] + '_Value'].isna()
+            both_nan_mask = nan_mask_1 & nan_mask_2
+
+            sum_values = result_df[[test + '_Value' for test in test_pair]].sum(axis=1, skipna=True)
+            sum_min_values = result_df[[test + '_MinValue' for test in test_pair]].sum(axis=1, skipna=True)
+            sum_max_values = result_df[[test + '_MaxValue' for test in test_pair]].sum(axis=1, skipna=True)
+
+            sum_transformed_values = pd.Series(index=result_df.index)
+
+            if alternate_sum and all([(alternate_sum + key) in result_df.columns for key in attr_dict.keys()]):
+                sum_values[both_nan_mask] = result_df[alternate_sum + '_Value'][both_nan_mask]
+                sum_min_values[both_nan_mask] = result_df[alternate_sum + '_MinValue'][both_nan_mask]
+                sum_max_values[both_nan_mask] = result_df[alternate_sum + '_MaxValue'][both_nan_mask]
+                sum_transformed_values[both_nan_mask] = result_df[alternate_sum + '_TransformedValue'][both_nan_mask]
+
+            both_tests_mask = ~nan_mask_1 & ~nan_mask_2
+            sum_transformed_values[both_tests_mask] = ((sum_values[both_tests_mask] - sum_min_values[
+                both_tests_mask]) * 100) / \
+                                                      (sum_max_values[both_tests_mask] - sum_min_values[
+                                                          both_tests_mask])
+
+            single_test_mask = nan_mask_1 ^ nan_mask_2
+            for i, mask in enumerate([nan_mask_1, nan_mask_2]):
+                current_mask = single_test_mask & ~mask
+                sum_values[current_mask] = result_df[test_pair[i] + '_Value'][current_mask].astype(str) + "!"
+                sum_min_values[current_mask] = result_df[test_pair[i] + '_MinValue'][current_mask].astype(str) + "!"
+                sum_max_values[current_mask] = result_df[test_pair[i] + '_MaxValue'][current_mask].astype(str) + "!"
+
+            sum_transformed_values_single = ((sum_values[single_test_mask].str.replace('!', '', regex=False).astype(
+                float) -
+                                              sum_min_values[single_test_mask].str.replace('!', '', regex=False).astype(
+                                                  float)) * 100) / \
+                                            (sum_max_values[single_test_mask].str.replace('!', '', regex=False).astype(
+                                                float) -
+                                             sum_min_values[single_test_mask].str.replace('!', '', regex=False).astype(
+                                                 float))
+            sum_transformed_values[single_test_mask] = sum_transformed_values_single.astype(str) + "!"
+
+            return sum_values, sum_min_values, sum_max_values, sum_transformed_values
+
         attr_dict = {
             '_TransformedValue': 'TransformedValue',
             '_Value': 'Value',
             '_MinValue': 'MinValue',
             '_MaxValue': 'MaxValue'
         }
+
+        counter = 0
         for test_pair in tests_to_sum:
             sum_test_name = "Сумма " + " и ".join(test_pair)
             counter += 1
@@ -302,44 +478,15 @@ class DataComposer:
 
             tests_columns_exist = all(
                 [(test + key) in result_df.columns for test in test_pair for key in attr_dict.keys()])
+
             if tests_columns_exist:
-                nan_mask_1 = result_df[test_pair[0] + '_Value'].isna()
-                nan_mask_2 = result_df[test_pair[1] + '_Value'].isna()
-                both_nan_mask = nan_mask_1 & nan_mask_2
-                sum_values = result_df[[test + '_Value' for test in test_pair]].sum(axis=1, skipna=True)
-                sum_min_values = result_df[[test + '_MinValue' for test in test_pair]].sum(axis=1, skipna=True)
-                sum_max_values = result_df[[test + '_MaxValue' for test in test_pair]].sum(axis=1, skipna=True)
                 if alternate_sum:
-                    alternate_columns_exist = all(
-                        [alternate_sum + key in result_df.columns for key in attr_dict.keys()])
-                    if alternate_columns_exist:
-                        sum_values[both_nan_mask] = result_df[alternate_sum + '_Value'][both_nan_mask]
-                        sum_min_values[both_nan_mask] = result_df[alternate_sum + '_MinValue'][both_nan_mask]
-                        sum_max_values[both_nan_mask] = result_df[alternate_sum + '_MaxValue'][both_nan_mask]
-                sum_transformed_values = pd.Series(index=result_df.index)
-                both_tests_mask = ~nan_mask_1 & ~nan_mask_2
-                sum_transformed_values[both_tests_mask] = ((sum_values[both_tests_mask] - sum_min_values[
-                    both_tests_mask]) * 100) / \
-                                                          (sum_max_values[both_tests_mask] - sum_min_values[
-                                                              both_tests_mask])
-                single_test_mask = nan_mask_1 ^ nan_mask_2
-                for i, mask in enumerate([nan_mask_1, nan_mask_2]):
-                    current_mask = single_test_mask & ~mask
-                    sum_values[current_mask] = result_df[test_pair[i] + '_Value'][current_mask].astype(str) + "!"
-                    sum_min_values[current_mask] = result_df[test_pair[i] + '_MinValue'][current_mask].astype(str) + "!"
-                    sum_max_values[current_mask] = result_df[test_pair[i] + '_MaxValue'][current_mask].astype(str) + "!"
-                sum_transformed_values_single = ((sum_values[single_test_mask].str.replace('!', '', regex=False).astype(
-                    float) -
-                                                  sum_min_values[single_test_mask].str.replace('!', '',
-                                                                                               regex=False).astype(
-                                                      float)) * 100) / \
-                                                (sum_max_values[single_test_mask].str.replace('!', '',
-                                                                                              regex=False).astype(
-                                                    float) -
-                                                 sum_min_values[single_test_mask].str.replace('!', '',
-                                                                                              regex=False).astype(
-                                                     float))
-                sum_transformed_values[single_test_mask] = sum_transformed_values_single.astype(str) + "!"
+                    sum_values, sum_min_values, sum_max_values, sum_transformed_values = calculate_values_with_alternate(
+                        result_df, test_pair, attr_dict, alternate_sum)
+                if equivalent:
+                    sum_values, sum_min_values, sum_max_values, sum_transformed_values = calculate_values_with_equivalent(
+                        result_df, test_pair, attr_dict, equivalent)
+
                 result_df[sum_test_name + '_TransformedValue'] = sum_transformed_values
                 result_df[sum_test_name + '_Value'] = sum_values
                 result_df[sum_test_name + '_MinValue'] = sum_min_values
@@ -428,7 +575,8 @@ class DataComposer:
 
             return top_rows
 
-        #result_df = result_df.groupby('UserHrid').apply(top_n_rows).reset_index(drop=True)
+        if options['top_n_rows']:
+            result_df = result_df.groupby('UserHrid').apply(top_n_rows).reset_index(drop=True)
 
         # Получите уникальные значения ObjectType
         unique_object_types = result_df['ObjectType'].unique()
@@ -540,9 +688,9 @@ class DataComposer:
     def enrich_results_with_school_info(result, pupil_user, school_class, school_df):
         # Выберем необходимые столбцы для каждой таблицы
         result_selected = result
-        pupil_user_selected = pupil_user[['UserId', 'SchoolClassId']]
+        pupil_user_selected = pupil_user[['UserId', 'SchoolClassId', 'Id']].rename(columns={'Id': 'PupilId'})
         school_class_selected = school_class[['Id', 'SchoolId']]
-        school_df_selected = school_df[['_id', 'Number']]
+        school_df_selected = school_df[['_id', 'Number', 'IsDeleted']].rename(columns={'IsDeleted': 'SchoolIsDeleted'})
 
         # Переименуем столбцы для избежания конфликтов имен
         school_class_selected = school_class_selected.rename(columns={'Id': 'SchoolClassId'})
@@ -653,6 +801,26 @@ class DataComposer:
         return merged_df
 
     @staticmethod
+    def enrich_results_with_is_deleted(result, profiles_df):
+        """
+        Насыщает основной датафрейм данными из профилей пользователей.
+
+        Параметры:
+        - result (pd.DataFrame): Исходный датафрейм.
+        - profiles_df (pd.DataFrame): Датафрейм профилей пользователей.
+
+        Возвращает:
+        - pd.DataFrame: Насыщенный датафрейм.
+        """
+
+        # Выберем необходимые столбцы из profiles_df
+        profiles_df_selected = profiles_df[['UserId', 'IsDeleted']]
+
+        # Объединяем основной датафрейм и выбранные столбцы из profiles_df по UserId
+        merged_df = pd.merge(result, profiles_df_selected, how='left', on='UserId')
+
+        return merged_df
+    @staticmethod
     def enrich_results_with_technical_info(result, profiles_df):
         """
         Насыщает основной датафрейм данными из профилей пользователей.
@@ -726,5 +894,39 @@ class DataComposer:
         print("Filtered result shape: ", filtered_df.shape)
         unique_municipalities = filtered_df['MunicipalityName'].unique()
         print("Filtered munic list:", unique_municipalities)
+
+        return filtered_df
+
+    @staticmethod
+    def filter_objects(df, filter_Objects):
+        """
+        Фильтрует датафрейм по объектам.
+
+        Параметры:
+        - df (pd.DataFrame): Исходный датафрейм.
+        - filter_Objects (list): Список объектов, которые нужно исключить из датафрейма.
+
+        Возвращает:
+        - pd.DataFrame: Отфильтрованный датафрейм.
+        """
+
+        filtered_df = df[~df['ObjectName'].isin(filter_Objects)]
+
+        return filtered_df
+
+    @staticmethod
+    def choice_objects(df, choice_Objects):
+        """
+        Фильтрует датафрейм по объектам.
+
+        Параметры:
+        - df (pd.DataFrame): Исходный датафрейм.
+        - choice_Objects (list): Список объектов, которые нужно оставить в датафрейме.
+
+        Возвращает:
+        - pd.DataFrame: Отфильтрованный датафрейм.
+        """
+
+        filtered_df = df[df['ObjectType'].isin(choice_Objects)]
 
         return filtered_df
