@@ -768,7 +768,8 @@ class DataComposer:
 
         # Фильтруем строки с нужными тестами
         mask = results_df['ScreeningTestName'].isin(tests_with_education_question)
-        new_rows = []
+        education_new_rows = []
+        direction_new_rows = []
         for idx, row in tqdm(results_df[mask].iterrows(), total=len(results_df[mask]), desc="Add education"):
             session_id = row['SessionId']
             if session_id not in processed_sessions:
@@ -786,7 +787,7 @@ class DataComposer:
                         new_row['ObjectType'] = "SPO_VO"
                         new_row['Name'] = "SPO_VO"
 
-                        new_rows.append(new_row)
+                        education_new_rows.append(new_row)
                         processed_sessions[session_id] = new_row
 
                     if answer_id in direction_map:
@@ -800,10 +801,12 @@ class DataComposer:
                         direction_row['ObjectType'] = "SPO_VO"
                         direction_row['Name'] = "Направление образования"
 
-                        new_rows.append(direction_row)
+                        direction_new_rows.append(direction_row)
         # Добавляем обработанные сессии к исходному датафрейму
-        results_df = pd.concat([pd.DataFrame(new_rows), results_df], ignore_index=True)
-
+        print("Добавлено {} строк с образованием".format(len(education_new_rows)))
+        print("Добавлено {} строк с направлением".format(len(direction_new_rows)))
+        results_df = pd.concat([pd.DataFrame(education_new_rows), results_df], ignore_index=True)
+        results_df = pd.concat([pd.DataFrame(direction_new_rows), results_df], ignore_index=True)
 
         return results_df
     # @staticmethod
