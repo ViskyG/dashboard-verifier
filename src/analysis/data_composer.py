@@ -329,7 +329,7 @@ class DataComposer:
         print("tester check. 'create_excel_from_prepared_dataframe'")
         Tester.check_values_in_dataframe(df)
 
-        columns = ['UserHrid', 'Name', 'ClassName', 'СПО/ВО', 'ObjectType', 'SchoolName', 'MunicipalityName']
+        columns = ['UserHrid', 'Name', 'ClassName', 'ObjectType', 'SchoolName', 'MunicipalityName']
         for _, row in unique_tests.iterrows():
             test_name = f"{row['ScreeningTestName']}_{row['VariantName']}"
             columns.extend([test_name + '_TransformedValue', test_name + '_Value', test_name + '_MinValue',
@@ -347,7 +347,6 @@ class DataComposer:
                     'UserId': group['UserId'].iloc[0],
                     'Name': group['Name'].iloc[0],
                     'ClassName': group['ClassName'].iloc[0],
-                    'СПО_ВО': group['СПО_ВО'].iloc[0],
                     'ObjectType': group['ObjectType'].iloc[0],
                     'SchoolName': group['SchoolName'].iloc[0],
                     'MunicipalityName': group['MunicipalityName'].iloc[0],
@@ -381,19 +380,22 @@ class DataComposer:
 
             return pd.Series(data)
 
-        # Группировка по UserHrid и Name_Object
+        # Группировка по UserHrid, 'ObjectType' и Name_Object
         grouped = df.groupby(['UserHrid', 'ObjectType', 'Name'])
-
+        print("Группировка по UserHrid, 'ObjectType' и Name_Object")
+        print(grouped.head(10))
         counter = 0
         result_data = []
         print("Количество групп")
         print(df.shape[0])
         # Применение функции к каждой группе
         for _, group in grouped:
-            result_data.append(aggregate_tests(group))
+            res = aggregate_tests(group)
+            result_data.append(res)
             counter += 1
             if counter % 10000 == 0:
                 print(f"Обработано {counter} групп")
+                print(res)
 
         # Добавление результатов в result_df
         result_df = pd.concat([result_df, pd.DataFrame(result_data)], ignore_index=True)
