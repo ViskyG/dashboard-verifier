@@ -9,6 +9,9 @@ import os
 import pandas as pd
 import fastparquet
 
+from src.Test.tester import Tester
+
+
 def analyze_and_write_results_per_municipality_and_school(object_type, threshold_value, objects, result, base_output_dir):
     municipalities = result['MunicipalityName'].dropna().unique()
 
@@ -121,6 +124,13 @@ def main():
         'test_schools.csv'
     ]
 
+    test_values = [
+        {'UserId': '699e018f-2cb4-4116-98ef-280a5b371c00', 'Name': "Спорт"},
+        {'UserId': 'c657d17e-d23a-4f46-8199-ed966bb8f310', 'Name': "Красота и мода"},
+        {'UserId': '15efcfe0-5842-4ffd-8a9a-2fd098fb3250', 'Name': "Спорт"}
+    ]
+
+    Tester.set_test_values(test_values)
 
 
     # Initialize the FileReader object
@@ -144,6 +154,9 @@ def main():
 
     validator = dv.DataValidator()
     df_without_duplicates = validator.remove_duplicates_by_id(dataframes['_pskovskaya_result_2.csv'])
+
+    print("tester check. df_without_duplicates")
+    Tester.check_values_in_dataframe(df_without_duplicates)
 
     result_with_tech_info_df = dc.DataComposer.enrich_results_with_technical_info(df_without_duplicates,
                                                                                   dataframes['_UserProfiles_Pskov.csv'])
@@ -187,6 +200,8 @@ def main():
                                                                     dataframes['test_municipalities.csv'],
                                                                     dataframes['test_schools.csv'])
 
+    print("tester check. enriched_and_filtered_result")
+    Tester.check_values_in_dataframe(df_without_duplicates)
 
 
     #tests_to_sum = [("Тест на способности для ЯНАО_Стандартный вариант для всех",

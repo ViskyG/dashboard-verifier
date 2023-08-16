@@ -8,6 +8,9 @@ import xlsxwriter
 
 from tqdm import tqdm
 
+from src.Test.tester import Tester
+
+
 class DataComposer:
 
     def __init__(self):
@@ -159,11 +162,17 @@ class DataComposer:
             df = df[df['IsDeleted'] == False]
             print('after ', df.shape[0])
 
+        print("tester check. delete is_delete")
+        Tester.check_values_in_dataframe(df)
+
         if options['delete SchoolIsDeleted']:
             print("delete SchoolIsDeleted = True")
             print('before ', df.shape[0])
             df = df[df['SchoolIsDeleted'] == False]
             print('after ', df.shape[0])
+
+        print("tester check. 'delete SchoolIsDeleted'")
+        Tester.check_values_in_dataframe(df)
 
         # Генерация тестовых данных, если требуется
         if options['is_test']:
@@ -172,11 +181,17 @@ class DataComposer:
             df = DataComposer.generate_test_data(df)
             print('after ', df.shape[0])
 
+        print("tester check. 'is_test'")
+        Tester.check_values_in_dataframe(df)
+
         if options['is_filter_Objects']:
             print("is_filter_Objects = True")
             print('before ', df.shape[0])
             df = DataComposer.filter_objects(df, filter_Objects)
             print('after ', df.shape[0])
+
+            print("tester check. 'is_filter_Objects'")
+            Tester.check_values_in_dataframe(df)
 
         if options['is_choice_Objects']:
             print("is_choice_Objects = True")
@@ -184,11 +199,17 @@ class DataComposer:
             df = DataComposer.choice_objects(df, choice_Objects)
             print('after ', df.shape[0])
 
+            print("tester check. 'is_choice_Objects'")
+            Tester.check_values_in_dataframe(df)
+
         if options['is_choice_tests']:
             print("is_choice_tests = True")
             print('before ', df.shape[0])
             df = DataComposer.choice_and_sort(df, test_names=choice_tests)
             print('after ', df.shape[0])
+
+            print("tester check. 'is_choice_tests'")
+            Tester.check_values_in_dataframe(df)
 
         if options['is_filter_tests']:
             print("is_filter_tests = True")
@@ -196,12 +217,17 @@ class DataComposer:
             df = DataComposer.exclude_tests(df)
             print('after ', df.shape[0])
 
+            print("tester check. 'is_filter_tests'")
+            Tester.check_values_in_dataframe(df)
+
         if options['is_last_results']:
             print("is_last_results = True")
             print('before ', df.shape[0])
             df = DataComposer.filter_latest_results(df)
             print('after ', df.shape[0])
 
+            print("tester check. 'is_last_results'")
+            Tester.check_values_in_dataframe(df)
 
         return df, options
 
@@ -294,6 +320,9 @@ class DataComposer:
 
         if tests_to_sum is None:
             tests_to_sum = []
+
+        print("tester check. 'create_excel_from_prepared_dataframe'")
+        Tester.check_values_in_dataframe(df)
 
         unique_tests = df[['ScreeningTestName', 'VariantName']].drop_duplicates()
 
@@ -492,6 +521,14 @@ class DataComposer:
                 result_df[sum_test_name + '_MinValue'] = sum_min_values
                 result_df[sum_test_name + '_MaxValue'] = sum_max_values
 
+        test_values = [
+            {'UserId': '699e018f-2cb4-4116-98ef-280a5b371c00', 'Object_Name': "Спорт"},
+            {'UserId': 'c657d17e-d23a-4f46-8199-ed966bb8f310', 'Object_Name': "Красота и мода"},
+            {'UserId': '15efcfe0-5842-4ffd-8a9a-2fd098fb3250', 'Object_Name': "Спорт"}
+        ]
+
+        print("tester check. sum tests")
+        Tester.check_values_in_dataframe(df)
 
         # if tests_to_sum:
         #     attr_dict = {
