@@ -314,7 +314,7 @@ class DataComposer:
                     'UserId': group['UserId'].iloc[0],
                     'Name': group['Name'].iloc[0],
                     'ClassName': group['ClassName'].iloc[0],
-                    'СПО/ВО': group['СПО/ВО'].iloc[0],
+                    'СПО_ВО': group['СПО_ВО'].iloc[0],
                     'ObjectType': group['ObjectType'].iloc[0],
                     'SchoolName': group['SchoolName'].iloc[0],
                     'MunicipalityName': group['MunicipalityName'].iloc[0],
@@ -770,7 +770,7 @@ class DataComposer:
                         new_row['MinValue'] = 1
                         new_row['MaxValue'] = 3
                         new_row['ObjectType'] = "SPO/VO"
-                        new_row['Name'] = "SPO/VO"
+                        new_row['Name'] = "SPO_VO"
 
                         new_rows.append(new_row)
                         processed_sessions[session_id] = new_row
