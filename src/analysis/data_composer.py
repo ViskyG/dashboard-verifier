@@ -769,7 +769,7 @@ class DataComposer:
                         new_row['Value'] = transformed_value  # Если 'Value' также должно быть числом
                         new_row['MinValue'] = 1
                         new_row['MaxValue'] = 3
-                        new_row['ObjectType'] = "SPO/VO"
+                        new_row['ObjectType'] = "SPO_VO"
                         new_row['Name'] = "SPO_VO"
 
                         new_rows.append(new_row)
