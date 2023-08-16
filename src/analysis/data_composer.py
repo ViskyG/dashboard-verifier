@@ -596,32 +596,7 @@ class DataComposer:
             10: "Другое (напиши, что именно)"
         }
 
-        def replace_value(row):
-            # Получаем название столбца для определения значения
-            value_column_name = "Сумма " + " и ".join(test_pair) + '_Value'
-            str_value = row[value_column_name]
 
-            # Преобразовываем значение в строку, если оно ещё не является таковым
-            if not isinstance(str_value, str):
-                str_value = str(str_value)
-
-            try:
-                value = float(str_value.rstrip('!'))
-            except ValueError:
-                return str_value
-
-            # Определяем словарь для маппинга на основе Name_Object
-            if row['Name_Object'] == 'SPO_VO':
-                return education_map_inverse.get(value, str_value)
-            elif row['Name_Object'] == 'Направление образования':
-                return direction_map_inverse.get(value, str_value)
-            return str_value
-
-        # Применяем функцию replace_value к каждой строке датафрейма
-        for test_pair in tests_to_sum:
-            transformed_column_name = "Сумма " + " и ".join(test_pair) + '_TransformedValue'
-            if transformed_column_name in result_df.columns:
-                result_df[transformed_column_name] = result_df.apply(replace_value, axis=1)
 
         print("Формирование файла Excel...")
 
