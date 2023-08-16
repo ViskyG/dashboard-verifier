@@ -540,6 +540,52 @@ class DataComposer:
         #             result_df[sum_test_name + '_MinValue'] = sum_min_values
         #             result_df[sum_test_name + '_MaxValue'] = sum_max_values
 
+        education_map_inverse = {
+            1: "Высшее",
+            2: "Затрудняюсь ответить",
+            3: "Среднее"
+        }
+
+        direction_map_inverse = {
+            1: "Математика и естественные науки",
+            2: "Гуманитарные науки",
+            3: "Искусство и культура",
+            4: "Науки об обществе",
+            5: "Информатика и компьютерные науки",
+            6: "Здравоохранение и медицина",
+            7: "Сельское хозяйство",
+            8: "Образование и педагогические науки",
+            9: "Инженерное дело, технологии и технические науки",
+            10: "Другое (напиши, что именно)"
+        }
+
+        def map_values_to_names(row, test_name, mapping):
+            str_value = row[test_name]
+            # Удаляем '!', если он есть, и преобразуем строку в число
+            try:
+                value = float(str_value.rstrip('!'))
+                # Если это значение есть в словаре маппинга, верните его именное значение
+                return mapping.get(value, str_value)
+            except ValueError:  # Если преобразование в float не удалось
+                return str_value
+
+        # Примените функцию map_values_to_names к вашему dataframe
+        for test_pair in tests_to_sum:
+            sum_test_name = "Сумма " + " и ".join(test_pair)
+            if sum_test_name + '_TransformedValue' in result_df.columns:
+                if 'SPO_VO' in test_pair:
+                    result_df[sum_test_name + '_TransformedValue'] = result_df.apply(
+                        lambda row: map_values_to_names(row, sum_test_name + '_TransformedValue',
+                                                        education_map_inverse),
+                        axis=1
+                    )
+                elif 'Направление образования' in test_pair:
+                    result_df[sum_test_name + '_TransformedValue'] = result_df.apply(
+                        lambda row: map_values_to_names(row, sum_test_name + '_TransformedValue',
+                                                        direction_map_inverse),
+                        axis=1
+                    )
+
         print("Формирование файла Excel...")
 
         # Если папки не существует, создать её
