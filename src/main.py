@@ -114,7 +114,7 @@ def main():
         'all_sessions.csv',
         '_Objects__202307211518.csv',
         '_PupilUsers__202308010610.csv',
-        '_UserAnswers__202308111406.csv',
+        '_UserAnswers__202308160954.csv',
         '_Aggregates__202308120653.csv',
         '_UserProfiles_Pskov.csv',
         'test_municipalities.csv',
@@ -181,7 +181,7 @@ def main():
 
     results_with_with_education_df = dc.DataComposer.enrich_results_with_education(enrich_results_with_is_deleted,
                                                                                    dataframes[
-                                                                                       '_UserAnswers__202308111406.csv'])
+                                                                                       '_UserAnswers__202308160954.csv'])
     folder_name = 'Pskov_3'
     enriched_and_filtered_result = dc.DataComposer.filter_test_info(results_with_with_education_df, folder_name,
                                                                     dataframes['test_municipalities.csv'],
