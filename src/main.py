@@ -111,7 +111,7 @@ def main():
 
     # List of CSV file names to be read
     files = [
-        '_pskovskaya_result_2.csv', #_yanao_result_1
+        '_Results__202308161724ЗЗ_PSKOB.csv', #_yanao_result_1
         '_UserProfiles__202308041858.csv',
         '_SchoolClasses__202308010732.csv',
         'all_sessions.csv',
@@ -153,7 +153,7 @@ def main():
     threshold_value = 70.0
 
     validator = dv.DataValidator()
-    df_without_duplicates = validator.remove_duplicates_by_id(dataframes['_pskovskaya_result_2.csv'])
+    df_without_duplicates = validator.remove_duplicates_by_id(dataframes['_Results__202308161724ЗЗ_PSKOB.csv'])
 
     print("tester check. df_without_duplicates")
     Tester.check_values_in_dataframe(df_without_duplicates)
