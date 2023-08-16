@@ -398,6 +398,30 @@ class DataComposer:
         # Добавление результатов в result_df
         result_df = pd.concat([result_df, pd.DataFrame(result_data)], ignore_index=True)
 
+        def check_rows_presence(df):
+            # список Hrid для проверки
+            hrids_to_check = ["1413890", "1413855", "1413863"]  # заполните данными из вашего датасета
+
+            # список имен объектов для проверки
+            names_to_check = ["Спорт", "Красота и мода"]
+
+            # Проверка наличия необходимых столбцов в df
+            if 'UserHrid' not in df.columns or 'Name_Object' not in df.columns:
+                return "Ошибка: отсутствуют необходимые столбцы в датафрейме."
+
+            # Фильтрация результирующего датафрейма по значениям Hrid и Name_Object
+            filtered_df = df[df['UserHrid'].isin(hrids_to_check) & df['Name_Object'].isin(names_to_check)]
+
+            # Вывод результатов
+            if not filtered_df.empty:
+                return "Найдены следующие строки:\n", filtered_df[['UserHrid', 'Name_Object']]
+            else:
+                return "Строки не найдены."
+
+
+        result = check_rows_presence(result_df)
+        print(result)
+
         # Добавление столбцов для суммированных тестов (если это требуется)
         import numpy as np
 
