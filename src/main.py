@@ -192,11 +192,11 @@ def main():
 
     enrich_results_with_is_deleted = dc.DataComposer.enrich_results_with_is_deleted(enriched_result, profile_df)
 
-    results_with_with_education_df = dc.DataComposer.enrich_results_with_education(enrich_results_with_is_deleted,
-                                                                                   dataframes[
-                                                                                       '_UserAnswers__202308160954.csv'])
+    #results_with_with_education_df = dc.DataComposer.enrich_results_with_education(enrich_results_with_is_deleted,
+    #                                                                               dataframes[
+    #                                                                                   '_UserAnswers__202308160954.csv'])
     folder_name = 'Pskov_3'
-    enriched_and_filtered_result = dc.DataComposer.filter_test_info(results_with_with_education_df, folder_name,
+    enriched_and_filtered_result = dc.DataComposer.filter_test_info(enrich_results_with_is_deleted, folder_name,
                                                                     dataframes['test_municipalities.csv'],
                                                                     dataframes['test_schools.csv'])
 
