@@ -741,6 +741,20 @@ class DataComposer:
             "21bbf5c9-0ceb-419a-b7cd-b80b20012941": 3
         }
 
+        direction_map = {
+            "deb89ef8-d949-4e39-8465-4b0631bad75c": 1,
+            "268495a8-6fec-49a6-a29f-56257edc9b0d": 2,
+            "fa18110e-d80e-4752-9552-891a1ab1ae70": 3,
+            "3fbca86c-9bba-40dc-839b-a02bbe4e551c": 4,
+            "939fdf55-24af-4c92-8dd8-a4d303df212a": 5,
+            "60265495-a199-4d78-b033-a6b0ccd91187": 6,
+            "2100d0a7-bf00-4c94-a8d3-aa7031fbb5a6": 7,
+            "db3181c7-f89c-4bd6-b4f6-b5e2f689521e": 8,
+            "2173a865-ec38-4d04-a5ac-b722b7e6af9b": 9,
+            "b06734c0-1c8d-0d4f-4064-33d2da0f4f2c": 10
+            # ... добавьте остальные UUID и их соответствующие номера
+        }
+
         tests_with_education_question = ["Тест на интересы для Псковской области",
                                          "Тест на интересы для ЯНАО",
                                          "Тест для Псковской области",
@@ -775,6 +789,18 @@ class DataComposer:
                         new_rows.append(new_row)
                         processed_sessions[session_id] = new_row
 
+                    if answer_id in direction_map:
+                        direction_value = direction_map[answer_id]
+
+                        direction_row = row.copy()
+                        direction_row['TransformedValue'] = direction_value
+                        direction_row['Value'] = direction_value
+                        direction_row['MinValue'] = 1
+                        direction_row['MaxValue'] = len(direction_map)  # или 10, если у вас всегда будет 10 направлений
+                        direction_row['ObjectType'] = "SPO_VO"
+                        direction_row['Name'] = "Направление образования"
+
+                        new_rows.append(direction_row)
         # Добавляем обработанные сессии к исходному датафрейму
         results_df = pd.concat([pd.DataFrame(new_rows), results_df], ignore_index=True)
 
