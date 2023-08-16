@@ -596,32 +596,28 @@ class DataComposer:
             10: "Другое (напиши, что именно)"
         }
 
-        def map_values_to_names(row, test_name, mapping):
-            str_value = row[test_name]
-            # Удаляем '!', если он есть, и преобразуем строку в число
+        def replace_value(row):
+            # Получаем название столбца для замены
+            sum_test_name = "Сумма " + " и ".join(test_pair) + '_TransformedValue'
+            str_value = row[sum_test_name]
+
             try:
                 value = float(str_value.rstrip('!'))
-                # Если это значение есть в словаре маппинга, верните его именное значение
-                return mapping.get(value, str_value)
-            except ValueError:  # Если преобразование в float не удалось
+            except ValueError:
                 return str_value
 
-        # Примените функцию map_values_to_names к вашему dataframe
+            # Определяем словарь для маппинга на основе Name_Object
+            if row['Name_Object'] == 'SPO_VO':
+                return education_map_inverse.get(value, str_value)
+            elif row['Name_Object'] == 'Направление образования':
+                return direction_map_inverse.get(value, str_value)
+            return str_value
+
+        # Применяем функцию replace_value к каждой строке датафрейма
         for test_pair in tests_to_sum:
-            sum_test_name = "Сумма " + " и ".join(test_pair)
-            if sum_test_name + '_TransformedValue' in result_df.columns:
-                if 'SPO_VO' in test_pair:
-                    result_df[sum_test_name + '_TransformedValue'] = result_df.apply(
-                        lambda row: map_values_to_names(row, sum_test_name + '_TransformedValue',
-                                                        education_map_inverse),
-                        axis=1
-                    )
-                elif 'Направление образования' in test_pair:
-                    result_df[sum_test_name + '_TransformedValue'] = result_df.apply(
-                        lambda row: map_values_to_names(row, sum_test_name + '_TransformedValue',
-                                                        direction_map_inverse),
-                        axis=1
-                    )
+            sum_test_name = "Сумма " + " и ".join(test_pair) + '_TransformedValue'
+            if sum_test_name in result_df.columns:
+                result_df[sum_test_name] = result_df.apply(replace_value, axis=1)
 
         print("Формирование файла Excel...")
 
