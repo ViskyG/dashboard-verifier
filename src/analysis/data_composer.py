@@ -128,7 +128,7 @@ class DataComposer:
                  "Тест на интересы для ЯНАО",
                  "Тест для ЯНАО"}
 
-        choice_tests = yanao
+        choice_tests = pskovskaya_oblast
 
 
         filter_tests = {}
@@ -262,8 +262,8 @@ class DataComposer:
         print("Количество групп")
         print(df.shape[0])
 
-        equivalent = "Тест для ЯНАО_Стандартный вариант для всех"
-        #alternate_sum = "Тест для Псковской области_Стандартный вариант для всех"
+        #equivalent = "Тест для ЯНАО_Стандартный вариант для всех"
+        alternate_sum = "Тест для Псковской области_Стандартный вариант для всех"
 
         df, options = DataComposer.preprocess_data(df, tests_to_sum=tests_to_sum, isTest=False)
         print(options)
@@ -279,11 +279,11 @@ class DataComposer:
                 # Используем номер комбинации из легенды для имени файла
                 file_name = f"combo_{legend[test_variant]}"
                 DataComposer.create_excel_from_prepared_dataframe(group_df, output_folder, file_name, tests_to_sum,
-                                                                  equivalent=equivalent, options=options)
+                                                                  alternate_sum=alternate_sum, options=options)
 
         else:
             DataComposer.create_excel_from_prepared_dataframe(df, output_folder, 'result_out', tests_to_sum,
-                                                              equivalent=equivalent,
+                                                              alternate_sum=alternate_sum,
                                                               options=options)
     @staticmethod
     def create_excel_from_prepared_dataframe(df, output_folder, file_name, tests_to_sum=None, alternate_sum=None, equivalent=None, options=None):
@@ -333,7 +333,6 @@ class DataComposer:
                     'PupilId': group['PupilId'].iloc[0],
                     'Name_Object': group['Name'].iloc[0],
                     'ClassName': group['ClassName'].iloc[0],
-                    'СПО/ВО': group['СПО/ВО'].iloc[0],
                     'ObjectType': group['ObjectType'].iloc[0],
                     'SchoolName': group['SchoolName'].iloc[0],
                     'MunicipalityName': group['MunicipalityName'].iloc[0]
@@ -737,10 +736,11 @@ class DataComposer:
 
         # Создаём словарь для соответствия AnswerId и образования
         education_map = {
-            "1c95cb5b-d1f9-4345-a378-6d46ff8e890b": (1, "Высшее"),
-            "c2e934c1-e08a-4a40-97ad-2d7313b3ccda": (2, "Не знаю"),
-            "21bbf5c9-0ceb-419a-b7cd-b80b20012941": (3, "Средне специальное")
+            "1c95cb5b-d1f9-4345-a378-6d46ff8e890b": 1,
+            "c2e934c1-e08a-4a40-97ad-2d7313b3ccda": 2,
+            "21bbf5c9-0ceb-419a-b7cd-b80b20012941": 3
         }
+
         tests_with_education_question = ["Тест на интересы для Псковской области",
                                          "Тест на интересы для ЯНАО",
                                          "Тест для Псковской области",
@@ -750,52 +750,34 @@ class DataComposer:
         # Инициализируем словарь, чтобы отслеживать обработанные сессии
         processed_sessions = {}
 
+        answers_grouped = answers_df.groupby('SessionId')
+
         # Фильтруем строки с нужными тестами
         mask = results_df['ScreeningTestName'].isin(tests_with_education_question)
+        new_rows = []
         for idx, row in tqdm(results_df[mask].iterrows(), total=len(results_df[mask]), desc="Add education"):
             session_id = row['SessionId']
             if session_id not in processed_sessions:
-                answer_row = answers_df[answers_df['SessionId'] == session_id]
-                if not answer_row.empty:
+                if session_id in answers_grouped.groups:
+                    answer_row = answers_grouped.get_group(session_id)
                     answer_id = answer_row.iloc[0]['AnswerId']
                     if answer_id in education_map:
-                        transformed_value, value = education_map[answer_id]
-                        new_row = {
-                            'UserId': row['UserId'],
-                            'TransformedValue': transformed_value,
-                            'Value': value,
-                            'MinValue': 1,
-                            'MaxValue': 3,
-                            'SessionId': session_id,
-                            'ScreeningTestId': row['ScreeningTestId'],
-                            'VariantId': row['VariantId'],
-                            'City': row['City'],
-                            'CreatedDate': row['CreatedDate'],
-                            'Birthday': row['Birthday'],
-                            'FirstName': row['FirstName'],
-                            'MiddleName': row['MiddleName'],
-                            'LastName': row['LastName'],
-                            'PhoneNumber': row['PhoneNumber'],
-                            'SessionCreatedDate': row['SessionCreatedDate'],
-                            'SessionCompleted': row['SessionCompleted'],
-                            '_id': row['_id'],
-                            'ScreeningTestName': row['ScreeningTestName'],
-                            'VariantName': row['VariantName'],
-                            'UserHrid': row['UserHrid'],
-                            'ObjectType': "SPO/VO",
-                            'Name': "SPO/VO",
-                            'ClassName': row['ClassName'],
-                            'SchoolClassId': row['SchoolClassId'],
-                            'PupilId': row['PupilId'],
-                            'SchoolId': row['SchoolId'],
-                            'SchoolName': row['SchoolName'],
-                            'MunicipalityId': row['MunicipalityId'],
-                            'MunicipalityName': row['MunicipalityName']
-                        }
+                        transformed_value = education_map[answer_id]
+
+                        new_row = row.copy()
+                        new_row['TransformedValue'] = transformed_value
+                        new_row['Value'] = transformed_value  # Если 'Value' также должно быть числом
+                        new_row['MinValue'] = 1
+                        new_row['MaxValue'] = 3
+                        new_row['ObjectType'] = "SPO/VO"
+                        new_row['Name'] = "SPO/VO"
+
+                        new_rows.append(new_row)
                         processed_sessions[session_id] = new_row
 
         # Добавляем обработанные сессии к исходному датафрейму
-        results_df = results_df.append(list(processed_sessions.values()), ignore_index=True)
+        results_df = pd.concat([pd.DataFrame(new_rows), results_df], ignore_index=True)
+
 
         return results_df
     # @staticmethod

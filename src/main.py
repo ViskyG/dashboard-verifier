@@ -108,7 +108,7 @@ def main():
 
     # List of CSV file names to be read
     files = [
-        '_yanao_result_1.csv', #_yanao_result_1
+        '_pskovskaya_result_2.csv', #_yanao_result_1
         '_UserProfiles__202308041858.csv',
         '_SchoolClasses__202308010732.csv',
         'all_sessions.csv',
@@ -143,7 +143,7 @@ def main():
     threshold_value = 70.0
 
     validator = dv.DataValidator()
-    df_without_duplicates = validator.remove_duplicates_by_id(dataframes['_yanao_result_1.csv'])
+    df_without_duplicates = validator.remove_duplicates_by_id(dataframes['_pskovskaya_result_2.csv'])
 
     result_with_tech_info_df = dc.DataComposer.enrich_results_with_technical_info(df_without_duplicates,
                                                                                   dataframes['_UserProfiles_Pskov.csv'])
@@ -182,17 +182,17 @@ def main():
     results_with_with_education_df = dc.DataComposer.enrich_results_with_education(enrich_results_with_is_deleted,
                                                                                    dataframes[
                                                                                        '_UserAnswers__202308111406.csv'])
-    folder_name = 'yanao_2'
+    folder_name = 'Pskov_3'
     enriched_and_filtered_result = dc.DataComposer.filter_test_info(results_with_with_education_df, folder_name,
                                                                     dataframes['test_municipalities.csv'],
                                                                     dataframes['test_schools.csv'])
 
 
 
-    tests_to_sum = [("Тест на способности для ЯНАО_Стандартный вариант для всех",
-                     "Тест на интересы для ЯНАО_Стандартный вариант для всех")]
-    #tests_to_sum = [("Тест на способности для Псковской области_Стандартный вариант для всех",
-    #                 "Тест на интересы для Псковской области_Стандартный вариант для всех")]
+    #tests_to_sum = [("Тест на способности для ЯНАО_Стандартный вариант для всех",
+    #                 "Тест на интересы для ЯНАО_Стандартный вариант для всех")]
+    tests_to_sum = [("Тест на способности для Псковской области_Стандартный вариант для всех",
+                     "Тест на интересы для Псковской области_Стандартный вариант для всех")]
 
     dc.DataComposer.create_excel_from_dataframe(enriched_and_filtered_result, folder_name, tests_to_sum)
 
