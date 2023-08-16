@@ -382,7 +382,7 @@ class DataComposer:
             return pd.Series(data)
 
         # Группировка по UserHrid и Name_Object
-        grouped = df.groupby(['UserHrid', 'Name'])
+        grouped = df.groupby(['UserHrid', 'ObjectType', 'Name'])
 
         counter = 0
         result_data = []
