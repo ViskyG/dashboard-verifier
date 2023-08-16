@@ -22,7 +22,7 @@ def analyze_and_write_results_per_municipality_and_school(object_type, threshold
 
         # Filter results for the current municipality
         municipality_results = result[result['MunicipalityName'] == municipality]
-        print(municipality_results)
+
         # Analyze and write results for the municipality
         output_filename = os.path.join(municipality_dir, f'{clear_municipality}_output.html')
         write_results(output_filename, objects, municipality_results, threshold_value)
@@ -36,7 +36,7 @@ def analyze_and_write_results_per_municipality_and_school(object_type, threshold
 
             # Filter results for the current school
             school_results = municipality_results[municipality_results['SchoolName'] == school]
-            print(school_results)
+
             output_filename = os.path.join(school_dir, f'{clear_school}_output.html')
 
             # Analyze and write results for the school

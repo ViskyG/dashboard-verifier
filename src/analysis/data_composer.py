@@ -31,7 +31,7 @@ class DataComposer:
         # Создаем tqdm объект для отслеживания прогресса
         tqdm.pandas(desc="Filtering latest results")
 
-        print(df.columns)
+
 
         df['SessionCreatedDate'] = pd.to_datetime(df['SessionCreatedDate'])
 
@@ -597,9 +597,13 @@ class DataComposer:
         }
 
         def replace_value(row):
-            # Получаем название столбца для замены
-            sum_test_name = "Сумма " + " и ".join(test_pair) + '_TransformedValue'
-            str_value = row[sum_test_name]
+            # Получаем название столбца для определения значения
+            value_column_name = "Сумма " + " и ".join(test_pair) + '_Value'
+            str_value = row[value_column_name]
+
+            # Преобразовываем значение в строку, если оно ещё не является таковым
+            if not isinstance(str_value, str):
+                str_value = str(str_value)
 
             try:
                 value = float(str_value.rstrip('!'))
@@ -615,9 +619,9 @@ class DataComposer:
 
         # Применяем функцию replace_value к каждой строке датафрейма
         for test_pair in tests_to_sum:
-            sum_test_name = "Сумма " + " и ".join(test_pair) + '_TransformedValue'
-            if sum_test_name in result_df.columns:
-                result_df[sum_test_name] = result_df.apply(replace_value, axis=1)
+            transformed_column_name = "Сумма " + " и ".join(test_pair) + '_TransformedValue'
+            if transformed_column_name in result_df.columns:
+                result_df[transformed_column_name] = result_df.apply(replace_value, axis=1)
 
         print("Формирование файла Excel...")
 
@@ -679,7 +683,7 @@ class DataComposer:
     @staticmethod
     def decompose_by_tests_and_variants(df):
         tests_data = {}
-        print(df.columns)
+
         tests = df['ScreeningTestName'].dropna().unique()
 
         for test in tests:
