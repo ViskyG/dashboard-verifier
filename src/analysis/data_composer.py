@@ -326,6 +326,9 @@ class DataComposer:
 
         unique_tests = df[['ScreeningTestName', 'VariantName']].drop_duplicates()
 
+        print("tester check. 'create_excel_from_prepared_dataframe'")
+        Tester.check_values_in_dataframe(df)
+
         columns = ['UserHrid', 'Name', 'ClassName', 'СПО/ВО', 'ObjectType', 'SchoolName', 'MunicipalityName']
         for _, row in unique_tests.iterrows():
             test_name = f"{row['ScreeningTestName']}_{row['VariantName']}"
