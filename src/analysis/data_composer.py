@@ -111,7 +111,7 @@ class DataComposer:
     @staticmethod
     def preprocess_data(df: pd.DataFrame, tests_to_sum=None, isTest=False, technical_information=False) -> pd.DataFrame:
         options = {
-        'is_test' : True,
+        'is_test' : False,
         'is_choice_tests': True,
         'is_filter_tests': False,
         'is_filter_Objects' : False,
