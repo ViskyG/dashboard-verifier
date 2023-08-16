@@ -5,6 +5,7 @@ from typing import List
 import os
 import openpyxl
 import xlsxwriter
+
 from tqdm import tqdm
 
 class DataComposer:
@@ -762,21 +763,27 @@ class DataComposer:
                                          ]
 
         # Инициализируем словарь, чтобы отслеживать обработанные сессии
-        processed_sessions = {}
+        processed_sessions_education = set()
+        processed_sessions_direction = set()
+
+        education_new_rows = []
+        direction_new_rows = []
+
+        mask = results_df['ScreeningTestName'].isin(tests_with_education_question)
 
         answers_grouped = answers_df.groupby('SessionId')
 
         # Фильтруем строки с нужными тестами
-        mask = results_df['ScreeningTestName'].isin(tests_with_education_question)
-        education_new_rows = []
-        direction_new_rows = []
         for idx, row in tqdm(results_df[mask].iterrows(), total=len(results_df[mask]), desc="Add education"):
             session_id = row['SessionId']
-            if session_id not in processed_sessions:
-                if session_id in answers_grouped.groups:
-                    answer_row = answers_grouped.get_group(session_id)
-                    answer_id = answer_row.iloc[0]['AnswerId']
-                    if answer_id in education_map:
+
+            if session_id in answers_grouped.groups:
+                answer_rows = answers_grouped.get_group(session_id)
+
+                for _, answer_row in answer_rows.iterrows():
+                    answer_id = answer_row['AnswerId']
+
+                    if answer_id in education_map and session_id not in processed_sessions_education:
                         transformed_value = education_map[answer_id]
 
                         new_row = row.copy()
@@ -788,9 +795,9 @@ class DataComposer:
                         new_row['Name'] = "SPO_VO"
 
                         education_new_rows.append(new_row)
-                        processed_sessions[session_id] = new_row
+                        processed_sessions_education.add(session_id)
 
-                    if answer_id in direction_map:
+                    if answer_id in direction_map and session_id not in processed_sessions_direction:
                         direction_value = direction_map[answer_id]
 
                         direction_row = row.copy()
@@ -802,6 +809,7 @@ class DataComposer:
                         direction_row['Name'] = "Направление образования"
 
                         direction_new_rows.append(direction_row)
+                        processed_sessions_direction.add(session_id)
         # Добавляем обработанные сессии к исходному датафрейму
         print("Добавлено {} строк с образованием".format(len(education_new_rows)))
         print("Добавлено {} строк с направлением".format(len(direction_new_rows)))
