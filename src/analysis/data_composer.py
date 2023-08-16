@@ -773,7 +773,8 @@ class DataComposer:
 
         answers_grouped = answers_df.groupby('SessionId')
 
-        # Фильтруем строки с нужными тестами
+        education_new_rows = []
+
         for idx, row in tqdm(results_df[mask].iterrows(), total=len(results_df[mask]), desc="Add education"):
             session_id = row['SessionId']
 
@@ -797,6 +798,17 @@ class DataComposer:
                         education_new_rows.append(new_row)
                         processed_sessions_education.add(session_id)
 
+        direction_new_rows = []
+
+        for idx, row in tqdm(results_df[mask].iterrows(), total=len(results_df[mask]), desc="Add direction"):
+            session_id = row['SessionId']
+
+            if session_id in answers_grouped.groups:
+                answer_rows = answers_grouped.get_group(session_id)
+
+                for _, answer_row in answer_rows.iterrows():
+                    answer_id = answer_row['AnswerId']
+
                     if answer_id in direction_map and session_id not in processed_sessions_direction:
                         direction_value = direction_map[answer_id]
 
@@ -810,6 +822,7 @@ class DataComposer:
 
                         direction_new_rows.append(direction_row)
                         processed_sessions_direction.add(session_id)
+
         # Добавляем обработанные сессии к исходному датафрейму
         print("Добавлено {} строк с образованием".format(len(education_new_rows)))
         print("Добавлено {} строк с направлением".format(len(direction_new_rows)))
