@@ -111,7 +111,7 @@ def main():
 
     # List of CSV file names to be read
     files = [
-        '_Results__202308161724ЗЗ_PSKOB.csv', #_yanao_result_1
+        'filtered_results_Pskov_v1.csv', #_yanao_result_1
         '_UserProfiles__202308041858.csv',
         '_SchoolClasses__202308010732.csv',
         'all_sessions.csv',
@@ -153,7 +153,7 @@ def main():
     threshold_value = 70.0
 
     validator = dv.DataValidator()
-    df_without_duplicates = validator.remove_duplicates_by_id(dataframes['_Results__202308161724ЗЗ_PSKOB.csv'])
+    df_without_duplicates = validator.remove_duplicates_by_id(dataframes['filtered_results_Pskov_v1.csv'])
 
     print("tester check. df_without_duplicates")
     Tester.check_values_in_dataframe(df_without_duplicates)
@@ -232,10 +232,21 @@ def analyze_and_write_results(object_type, threshold_value, objects, result, htm
         html_output.write(output_string)
 
 def test():
+    # Define the configuration file for MongoDB
+    # config_file = "src/mongo_config.json"
+    # # Initialize the MongoDBToDataFrame object with the config file
+    # db_to_df = mongo_db_to_dt.MongoDBToDataFrame(config_file)
+    #
+
+
     # List of CSV file names to be read
     files = [
         '_UserProfiles__202308041858.csv',
-        'all_sessions.csv'
+        '_Results__202308161724ЗЗ_PSKOB.csv',
+        '_Objects__202307211518.csv',
+        '_Aggregates__202308162114.csv',
+        '_FactorMinMaxes__202308162115.csv',
+        'sessions.csv'
     ]
 
     # Initialize the FileReader object
@@ -243,36 +254,93 @@ def test():
 
     # Read the CSV files into a dictionary of DataFrames
     dataframes = filereader.get_df_from_csv(files)
+
+    sessions = dataframes['sessions.csv']
     user_profiles_df = dataframes['_UserProfiles__202308041858.csv']
+    results_df = dataframes['_Results__202308161724ЗЗ_PSKOB.csv']
+    objects_df = dataframes['_Objects__202307211518.csv']
+    aggregates_df = dataframes['_Aggregates__202308162114.csv']
+    factor_min_maxes_df = dataframes['_FactorMinMaxes__202308162115.csv']
 
-    sessions_df = dataframes['all_sessions.csv']
+    # Преобразование строковых дат в datetime
+    sessions['CreatedDate'] = pd.to_datetime(sessions['CreatedDate'])
+    results_df['CreatedDate'] = pd.to_datetime(results_df['CreatedDate'])
 
-    # Преобразуем столбец CreatedDate в формат datetime
-    #sessions_df["CreatedDate"] = pd.to_datetime(sessions_df["CreatedDate"])
 
-    #print(f"Number of rows in sessions_df: {sessions_df.shape[0]}")
+    # 1. Отфильтровать sessions по 2023 году
+    sessions_2023 = sessions[sessions['CreatedDate'].dt.year == 2023]
 
-    # Отбираем записи, где год CreatedDate равен 2023
-    #filtered_sessions_by_date = sessions_df[sessions_df["CreatedDate"].dt.year == 2023]
+    print('sessions_2023')
+    # 2. Выбрать пользователей из user_profiles_df
+    filtered_users = user_profiles_df[user_profiles_df['RegionId'] == '2beb4790-b106-4de9-bf31-7a87d2dbab5b']
 
-    print(f"Number of rows in sessions_df: {sessions_df.shape[0]}")
+    # 3. Отфильтровать results_df
+    screening_test_ids = [
+        'd9668ebf-ab47-49dc-bba4-ecdb944060a9',
+        'b81b69aa-1f3a-4702-be7f-d1419a962040',
+        '22249e14-9150-4ed7-bd77-82d4bd0bf1b5'
+    ]
 
-    # Оставляем только столбцы _id и UserId
-    filtered_sessions_by_date = sessions_df[["_id", "UserId"]]
+    print('results_filtered')
+    results_filtered = results_df[
+        (results_df['CreatedDate'].dt.year == 2023) &
+        (results_df['ScreeningTestId'].isin(screening_test_ids))
+        ]
 
-    # Отбираем строки из user_profiles_df, где RegionId равен определенному значению (например, 1)
-    filtered_profiles = user_profiles_df[user_profiles_df["RegionId"] == "2beb4790-b106-4de9-bf31-7a87d2dbab5b"]
+    print(results_filtered.columns.tolist())
 
-    # Выводим количество записей в final_filtered_sessions и filtered_profiles
-    print(f"Number of rows in final_filtered_sessions: {filtered_sessions_by_date.shape[0]}")
-    print(f"Number of rows in filtered_profiles: {filtered_profiles.shape[0]}")
+    print('merged_df')
+    # 4. Соединения
+    merged_df = (
+        results_filtered
+        .merge(sessions_2023[['_id', 'UserId']], left_on='SessionId', right_on='_id', how='inner')
+        .merge(filtered_users['UserId'], on='UserId', how='inner')
+        .merge(objects_df[['Id', 'Name', 'ObjectType']], left_on='ObjectId', right_on='Id', how='left', suffixes=('', '_obj'))
+        .merge(factor_min_maxes_df[['ObjectId', 'ScreeningTestId', 'VariantId', 'MinValue', 'MaxValue']],
+               on=['ObjectId', 'ScreeningTestId', 'VariantId'], how='left')
+    )
 
-    # Отбираем строки из filtered_sessions_by_date, где UserId соответствует UserId из filtered_profiles
-    final_filtered_sessions = filtered_sessions_by_date[
-        filtered_sessions_by_date["UserId"].isin(filtered_profiles["UserId"])]
 
-    # Записываем полученный датафрейм в файл
-    final_filtered_sessions.to_csv("final_filtered_sessions_pscov.csv", index=False)
+    print(merged_df.columns.tolist())
+    merged_df.drop(columns=['_id', 'Id_obj', 'NormalizedValue', 'CreatedDate'], inplace=True)
+    # Убедитесь, что у вас есть все нужные столбцы и они идут в нужном порядке
+    merged_df = merged_df[["Id", "UserId", "ObjectId", "TransformedValue", "Value",
+                           "MinValue", "MaxValue", "SessionId", "ScreeningTestId",
+                           "VariantId", "ObjectType", "Name"]]
+
+
+
+    print("CSV")
+    # Экспорт в CSV и вывод списка колонок
+    merged_df.to_csv('filtered_results_Pskov_v1.csv', index=False)
+    print(merged_df.columns.tolist())
+
+    # # Преобразуем столбец CreatedDate в формат datetime
+    # #sessions_df["CreatedDate"] = pd.to_datetime(sessions_df["CreatedDate"])
+    #
+    # #print(f"Number of rows in sessions_df: {sessions_df.shape[0]}")
+    #
+    # # Отбираем записи, где год CreatedDate равен 2023
+    # #filtered_sessions_by_date = sessions_df[sessions_df["CreatedDate"].dt.year == 2023]
+    #
+    # print(f"Number of rows in sessions_df: {sessions_df.shape[0]}")
+    #
+    # # Оставляем только столбцы _id и UserId
+    # filtered_sessions_by_date = sessions_df[["_id", "UserId"]]
+    #
+    # # Отбираем строки из user_profiles_df, где RegionId равен определенному значению (например, 1)
+    # filtered_profiles = user_profiles_df[user_profiles_df["RegionId"] == "2beb4790-b106-4de9-bf31-7a87d2dbab5b"]
+    #
+    # # Выводим количество записей в final_filtered_sessions и filtered_profiles
+    # print(f"Number of rows in final_filtered_sessions: {filtered_sessions_by_date.shape[0]}")
+    # print(f"Number of rows in filtered_profiles: {filtered_profiles.shape[0]}")
+    #
+    # # Отбираем строки из filtered_sessions_by_date, где UserId соответствует UserId из filtered_profiles
+    # final_filtered_sessions = filtered_sessions_by_date[
+    #     filtered_sessions_by_date["UserId"].isin(filtered_profiles["UserId"])]
+    #
+    # # Записываем полученный датафрейм в файл
+    # final_filtered_sessions.to_csv("final_filtered_sessions_pscov.csv", index=False)
 
 def rename():
 
