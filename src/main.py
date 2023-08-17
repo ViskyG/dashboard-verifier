@@ -126,9 +126,8 @@ def main():
 
     test_values = [
         {'UserId': '699e018f-2cb4-4116-98ef-280a5b371c00', 'Name': "Спорт"},
-        {'UserId': 'c657d17e-d23a-4f46-8199-ed966bb8f310', 'Name': "Красота и мода"},
-        {'UserId': '15efcfe0-5842-4ffd-8a9a-2fd098fb3250', 'Name': "Спорт"}
-    ]
+        {'UserId': "ba1c9d59-4ad8-417a-879b-9256448637a1"},
+        ]
 
     Tester.set_test_values(test_values)
 

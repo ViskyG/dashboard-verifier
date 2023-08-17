@@ -23,12 +23,12 @@ class Tester:
         :return: None (выводит результаты в консоль).
         """
         for test_val in Tester.TEST_VALUES:
-            mask = (df['UserId'] == test_val['UserId']) & (df['Name'] == test_val['Name'])
+            mask = True
+            for key, value in test_val.items():
+                mask &= (df[key] == value)
+
             if df[mask].shape[0] > 0:
                 print(f"Значение {test_val} присутствует в датафрейме.")
             else:
                 print(f"Значение {test_val} отсутствует в датафрейме.")
-
-
-
 
