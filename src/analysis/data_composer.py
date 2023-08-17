@@ -115,8 +115,8 @@ class DataComposer:
         'is_choice_tests': True,
         'is_filter_tests': False,
         'is_filter_Objects' : False,
-        'is_choice_Objects' : False,
-        'top_n_rows' : False,
+        'is_choice_Objects' : True,
+        'top_n_rows' : True,
         'is_technical_information' : False,
         'is_last_results' : True,
         'is_separate_relults' : False,
@@ -137,7 +137,7 @@ class DataComposer:
 
         filter_tests = {}
         filter_Objects = {}
-        choice_Objects = {"FieldDO"}
+        choice_Objects = {"FieldDO"} #SPO_VO FieldDO
         filter_top = 0
 
 
@@ -427,7 +427,16 @@ class DataComposer:
         # Добавление столбцов для суммированных тестов (если это требуется)
         import numpy as np
 
+        def ensure_column_exists(df, column_name):
+            if column_name not in df.columns:
+                df[column_name] = np.nan
+
         def calculate_values_with_equivalent(result_df, test_pair, attr_dict, equivalent_test_name=None):
+
+            for test in test_pair:
+                for attr in attr_dict.keys():
+                    ensure_column_exists(result_df, test + attr)
+
             nan_mask_1 = result_df[test_pair[0] + '_Value'].isna()
             nan_mask_2 = result_df[test_pair[1] + '_Value'].isna()
             both_nan_mask = nan_mask_1 & nan_mask_2
@@ -478,7 +487,12 @@ class DataComposer:
             sum_transformed_values[single_test_mask] = sum_transformed_values_single.astype(str) + "!"
 
             return sum_values, sum_min_values, sum_max_values, sum_transformed_values
+
         def calculate_values_with_alternate(result_df, test_pair, attr_dict, alternate_sum=None):
+            for test in test_pair:
+                for attr in attr_dict.keys():
+                    ensure_column_exists(result_df, test + attr)
+
             nan_mask_1 = result_df[test_pair[0] + '_Value'].isna()
             nan_mask_2 = result_df[test_pair[1] + '_Value'].isna()
             both_nan_mask = nan_mask_1 & nan_mask_2
@@ -528,20 +542,36 @@ class DataComposer:
         }
 
         counter = 0
+        print("AAAAAAAAAAAAAAA")
+        print(tests_to_sum)
+        print()
         for test_pair in tests_to_sum:
+
             sum_test_name = "Сумма " + " и ".join(test_pair)
             counter += 1
             if counter % 10000 == 0:
                 print(f"Обработано {counter} групп")
+            print('result_df.columns')
+            print(result_df.columns)
+            print('test_pair')
+            print(test_pair)
+            tests_columns_exist_for_first_test = all(
+                [(test_pair[0] + key) in result_df.columns for key in attr_dict.keys()]
+            )
+            tests_columns_exist_for_second_test = all(
+                [(test_pair[1] + key) in result_df.columns for key in attr_dict.keys()]
+            )
 
-            tests_columns_exist = all(
-                [(test + key) in result_df.columns for test in test_pair for key in attr_dict.keys()])
-
+            tests_columns_exist = tests_columns_exist_for_first_test or tests_columns_exist_for_second_test
+            print(tests_columns_exist)
             if tests_columns_exist:
+                print('tests_columns_exist')
                 if alternate_sum:
+                    print('alternate_sum')
                     sum_values, sum_min_values, sum_max_values, sum_transformed_values = calculate_values_with_alternate(
                         result_df, test_pair, attr_dict, alternate_sum)
                 if equivalent:
+                    print('equivalent')
                     sum_values, sum_min_values, sum_max_values, sum_transformed_values = calculate_values_with_equivalent(
                         result_df, test_pair, attr_dict, equivalent)
 
@@ -549,7 +579,7 @@ class DataComposer:
                 result_df[sum_test_name + '_Value'] = sum_values
                 result_df[sum_test_name + '_MinValue'] = sum_min_values
                 result_df[sum_test_name + '_MaxValue'] = sum_max_values
-
+                print(sum_transformed_values)
         test_values = [
             {'UserId': '699e018f-2cb4-4116-98ef-280a5b371c00', 'Object_Name': "Спорт"},
             {'UserId': 'c657d17e-d23a-4f46-8199-ed966bb8f310', 'Object_Name': "Красота и мода"},
@@ -639,19 +669,19 @@ class DataComposer:
             except ValueError:
                 return str_value
 
-            # Определяем словарь для маппинга на основе Name_Object
-            if row['Name_Object'] == 'SPO_VO':
-                return education_map_inverse.get(value, str_value)
-            elif row['Name_Object'] == 'Направление образования':
-                return direction_map_inverse.get(value, str_value)
-            return str_value
+            # # Определяем словарь для маппинга на основе Name_Object
+            # if row['Name_Object'] == 'SPO_VO':
+            #     return education_map_inverse.get(value, str_value)
+            # elif row['Name_Object'] == 'Направление образования':
+            #     return direction_map_inverse.get(value, str_value)
+            # return str_value
 
             # Применяем функцию replace_value к каждой строке датафрейма
 
-        for test_pair in tests_to_sum:
-            transformed_column_name = "Сумма " + " и ".join(test_pair) + '_TransformedValue'
-            if transformed_column_name in result_df.columns:
-                result_df[transformed_column_name] = result_df.apply(replace_value, axis=1)
+        # for test_pair in tests_to_sum:
+        #     transformed_column_name = "Сумма " + " и ".join(test_pair) + '_TransformedValue'
+        #     if transformed_column_name in result_df.columns:
+        #         result_df[transformed_column_name] = result_df.apply(replace_value, axis=1)
 
         print("Формирование файла Excel...")
 
