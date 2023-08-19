@@ -1,10 +1,12 @@
 import pickle
 
-from db import mongo_db_to_data_frame as mongo_db_to_dt, filereader as fr
+from db import mongo_db_to_data_frame as mongo_db_to_dt, combined_file_reader as fr
 from analysis import result_analyzer as ra
 from output import html_out_writer as hw
 from analysis import data_validator as dv
 from analysis import data_composer as dc
+from configurations.regional_configuration import RegionalConfiguration
+from configurations.configuration import Configuration
 import os
 import pandas as pd
 import fastparquet
@@ -73,147 +75,214 @@ def write_results(output_filename, objects, results, threshold_value):
 
 # The main function is defined to control the execution of the code
 def main():
-    # # Define the configuration file for MongoDB
-    # config_file = "src/mongo_config.json"
-    # # Initialize the MongoDBToDataFrame object with the config file
-    # db_to_df = mongo_db_to_dt.MongoDBToDataFrame(config_file)
-    #
-    # # Convert the "Schools" collection in the "Catalog" database to a DataFrame
-    # school_df = db_to_df.convert_to_df("Catalog", "Schools", ["_id"])
-    #
-    # # Convert the "Regions" collection in the "Catalog" database to a DataFrame
-    # regions_df = db_to_df.convert_to_df("Catalog", "Regions", ["_id"])
-    #
-    # # Convert the "Regions" collection in the "Catalog" database to a DataFrame
-    # screening_tests_df = db_to_df.convert_to_df("Player", "ScreeningTests", ["_id"])
-    #
-    #
-    #
-    # # Convert the "Municipalities" collection in the "Catalog" database to a DataFrame
-    # municipalities_df = db_to_df.convert_to_df("Catalog", "Municipalities", ["_id"])
-    output_dir = 'files'  # замените на ваш путь к директории
+
+    # --- Инициализация и загрузка данных ---
+
+    # Установка региональных конфигураций
+    regional_config = RegionalConfiguration()
+    regional_config.set_region('Псковская область') #Псковская область, ЯНАО
+
+    filereader = fr.CombinedFileReader()
+    dataframes_from_files = filereader.load_files(regional_config)
+
+    # Извлечение данных из файлов
+    result = dataframes_from_files[regional_config.region_result_file_name]
+    user_profiles = dataframes_from_files['_UserProfiles__202308041858.csv']
+    enriched_user_profiles = dataframes_from_files[regional_config.enriched_user_profiles]
+    school_class = dataframes_from_files['_SchoolClasses__202308010732.csv']
+    all_sessions = dataframes_from_files['all_sessions.csv']
+    objects = dataframes_from_files['_Objects__202307211518.csv']
+    pupil_users = dataframes_from_files['_PupilUsers__202308010610.csv']
+    user_answers = dataframes_from_files['_UserAnswers__202308160954.csv']
+    aggregates = dataframes_from_files['_Aggregates__202308120653.csv']
+    test_municipalities = dataframes_from_files['test_municipalities.csv']
+    test_schools = dataframes_from_files['test_schools.csv']
+    school_df = dataframes_from_files['Schools.pkl']
+    regions_df = dataframes_from_files['Regions.pkl']
+    screening_tests_df = dataframes_from_files['ScreeningTests.pkl']
+    municipalities_df = dataframes_from_files['Municipalities.pkl']
+
+    # --- Определение настроек ---
+
+    # Основные настройки
+    options = {
+        'is_test': False,
+        'is_choice_tests': True,
+        'is_filter_tests': False,
+        'is_filter_Objects': False,
+        'is_choice_Objects': False,
+        'top_n_rows': False,
+        'is_technical_information': False,
+        'is_last_results': True,
+        'is_separate_results': True,
+        'delete_is_delete': True,
+        'delete_SchoolIsDeleted': True,
+        'with_education': True,
+        'translate': True,
+    }
+
+    # Тесты и объекты
+    choice_tests = regional_config.choice_tests
+    filter_tests = {}
+    filter_objects = {}
+    choice_objects = {"FieldDO"}  # SPO_VO FieldDO
+    filter_top = 0
+    alternate_sum = regional_config.alternate_sum
+
+    format_options = {
+        "technical_columns": ['PupilId', 'UserId', 'Birthday', 'FirstName', 'MiddleName', 'LastName', 'PhoneNumber', 'IsDeleted'],
+        "remove_columns": ['City'],
+        "remove_test_postfixes": [] #"_TransformedValue", "_MinValue", "_MaxValue"
+    }
+
+    # Создаем объект конфигурации
+    config = Configuration(
+        options=options,
+        choice_tests=choice_tests,
+        filter_tests=filter_tests,
+        filter_Objects=filter_objects,
+        choice_Objects=choice_objects,
+        filter_top=filter_top,
+        alternate_sum=alternate_sum,
+        regional_config=regional_config,
+        format_options=format_options
+    )
 
 
-    with open(os.path.join(output_dir, 'Schools.pkl'), 'rb') as file:
-        school_df = pickle.load(file)
 
-    with open(os.path.join(output_dir, 'Regions.pkl'), 'rb') as file:
-        regions_df = pickle.load(file)
-
-    with open(os.path.join(output_dir, 'ScreeningTests.pkl'), 'rb') as file:
-        screening_tests_df = pickle.load(file)
-
-    with open(os.path.join(output_dir, 'Municipalities.pkl'), 'rb') as file:
-        municipalities_df = pickle.load(file)
-
-
-    screening_tests_df = dc.DataComposer.compose_test_variants_dataframe(screening_tests_df)
-
-    # List of CSV file names to be read
-    files = [
-        'filtered_results_Pskov_v1.csv', #_yanao_result_1
-        '_UserProfiles__202308041858.csv',
-        '_SchoolClasses__202308010732.csv',
-        'all_sessions.csv',
-        '_Objects__202307211518.csv',
-        '_PupilUsers__202308010610.csv',
-        '_UserAnswers__202308160954.csv',
-        '_Aggregates__202308120653.csv',
-        '_UserProfiles_Pskov.csv',
-        'test_municipalities.csv',
-        'test_schools.csv'
-    ]
+    # --- Тестовые значения ---
 
     test_values = [
-        {'UserId': '699e018f-2cb4-4116-98ef-280a5b371c00', 'Name': "Спорт"},
-        {'UserId': "ba1c9d59-4ad8-417a-879b-9256448637a1"},
-        ]
 
+
+    ]
+
+    # --- Соединение тестового объекта и результата ---
     Tester.set_test_values(test_values)
 
-
-    # Initialize the FileReader object
-    filereader = fr.Filereader()
-
-    # Read the CSV files into a dictionary of DataFrames
-    dataframes = filereader.get_df_from_csv(files)
-
-    # Convert the "Regions" collection in the "Catalog" database to a DataFrame
-    sessions_df = dataframes['all_sessions.csv']
-
-    # Get the unique object types from the objects dataframe
-    all_object_types = dataframes['_Objects__202307211518.csv']["ObjectType"].unique()
-
-    # Clean the previous html output
+    # Очистка предыдущего выходного файла
     html_output = hw.HtmlOutWriter("../output.html")
     html_output.clean_html()
 
-    # Define the threshold value for the analysis
-    threshold_value = 70.0
-
+    # Инициализация валидатора
     validator = dv.DataValidator()
-    df_without_duplicates = validator.remove_duplicates_by_id(dataframes['filtered_results_Pskov_v1.csv'])
 
-    print("tester check. df_without_duplicates")
+    # Удаление дубликатов
+    df_without_duplicates = validator.remove_duplicates_by_id(result)
+    print(df_without_duplicates.keys())
     Tester.check_values_in_dataframe(df_without_duplicates)
 
-    result_with_tech_info_df = dc.DataComposer.enrich_results_with_technical_info(df_without_duplicates,
-                                                                                  dataframes['_UserProfiles_Pskov.csv'])
+    # Добавление технической информации и дополнительных данных
+    result_with_tech_info_df = dc.DataComposer.enrich_results_with_technical_info(
+        df_without_duplicates, enriched_user_profiles)
+    result_with_sessions_create_time_df = dc.DataComposer.enrich_results_with_sessions_create_time(
+        result_with_tech_info_df, all_sessions)
 
-    result_with_sessions_create_time_df = \
-        dc.DataComposer.enrich_results_with_sessions_create_time(result_with_tech_info_df, sessions_df)
+    screening_tests_df = dc.DataComposer.compose_test_variants_dataframe(screening_tests_df)
+    results_with_screening_test_df = dc.DataComposer.enrich_results_with_screening_test_info(
+        result_with_sessions_create_time_df, screening_tests_df)
+    results_with_additional_info_df = dc.DataComposer.enrich_results_with_additional_info(
+        results_with_screening_test_df, pupil_users, school_class)
 
-    results_with_screening_test_df = \
-        dc.DataComposer.enrich_results_with_screening_test_info(result_with_sessions_create_time_df, screening_tests_df)
-
-
-    results_with_with_edishnal_info_df = dc.DataComposer.enrich_results_with_additional_info(results_with_screening_test_df,
-                                                                                             dataframes['_PupilUsers__202308010610.csv'],
-                                                                                             dataframes['_SchoolClasses__202308010732.csv'])
-
-    # Analyze each object type and write the results to html
-    #for object_type in all_object_types:
-    #    ra.ResultAnalyzer.analyze_and_write_results(object_type, threshold_value,
-    #                                                dataframes['_Objects__202307211518.csv'],
-    #                                                results_with_with_education_df, html_output)
-
-    school_class_df = dataframes['_SchoolClasses__202308010732.csv']
-    pupil_user_df = dataframes['_PupilUsers__202308010610.csv']
-    objects_df = dataframes['_Objects__202307211518.csv']
-
-    sc_enriched_result = dc.DataComposer.enrich_results_with_school_info(results_with_with_edishnal_info_df, pupil_user_df,
-                                                                        school_class_df, school_df)
-
-    profile_df = dataframes['_UserProfiles__202308041858.csv']
-
-    enriched_result = dc.DataComposer.enrich_results_with_municipality_info(sc_enriched_result, profile_df,
+    # Обогащение результатов информацией о школах и муниципалитетах
+    sc_enriched_result = dc.DataComposer.enrich_results_with_school_info(results_with_additional_info_df, pupil_users,
+                                                                         school_class, school_df)
+    enriched_result = dc.DataComposer.enrich_results_with_municipality_info(sc_enriched_result, user_profiles,
                                                                             municipalities_df)
+    enrich_results_with_is_deleted = dc.DataComposer.enrich_results_with_is_deleted(enriched_result, user_profiles)
 
-    enrich_results_with_is_deleted = dc.DataComposer.enrich_results_with_is_deleted(enriched_result, profile_df)
+    #Обогащение результатов информацией об образовании
+    if options['with_education']:
+        results_with_with_education_df = dc.DataComposer.enrich_results_with_education(enrich_results_with_is_deleted, user_answers)
+    else:
+        results_with_with_education_df = enrich_results_with_is_deleted
 
-    # results_with_with_education_df = dc.DataComposer.enrich_results_with_education(enrich_results_with_is_deleted,
-    #                                                                                dataframes[
-    #                                                                                    '_UserAnswers__202308160954.csv'])
+    # Фильтрация результатов
+    enriched_and_filtered_result = dc.DataComposer.filter_test_info(results_with_with_education_df,
+                                                                    regional_config.folder_name, test_municipalities,
+                                                                    test_schools)
+    Tester.check_values_in_dataframe(enriched_and_filtered_result)
+    result = enriched_and_filtered_result.query("UserHrid == 1400995")
+    print(result)
+    print(enriched_and_filtered_result['UserHrid'].dtype)
+    enriched_and_filtered_result['UserHrid'].iloc[0].astype(str)
+    # Создание Excel файла
+    dc.DataComposer.create_excel_from_dataframe(enriched_and_filtered_result, config)
 
+    # Составление данных по муниципалитетам и школам
+    # composed_data = dc.DataComposer.compose_by_municipality_and_school(enriched_result)
 
-    folder_name = 'Pskov_3'
-    enriched_and_filtered_result = dc.DataComposer.filter_test_info(enrich_results_with_is_deleted, folder_name,
-                                                                    dataframes['test_municipalities.csv'],
-                                                                    dataframes['test_schools.csv'])
-
-    print("tester check. enriched_and_filtered_result")
-    Tester.check_values_in_dataframe(df_without_duplicates)
-
-
-    #tests_to_sum = [("Тест на способности для ЯНАО_Стандартный вариант для всех",
-    #                 "Тест на интересы для ЯНАО_Стандартный вариант для всех")]
-    tests_to_sum = [("Тест на способности для Псковской области_Стандартный вариант для всех",
-                     "Тест на интересы для Псковской области_Стандартный вариант для всех")]
-
-    dc.DataComposer.create_excel_from_dataframe(enriched_and_filtered_result, folder_name, tests_to_sum)
-
-    composed_data = dc.DataComposer.compose_by_municipality_and_school(enriched_result)
-    ra.ResultAnalyzer.analyze_composed_data(composed_data, threshold_value, objects_df, folder_name)
+    # # Clean the previous html output
+    # html_output = hw.HtmlOutWriter("../output.html")
+    # html_output.clean_html()
+    #
+    # # Convert the "Regions" collection in the "Catalog" database to a DataFrame
+    # sessions_df = all_sessions
+    #
+    # # Get the unique object types from the objects dataframe
+    # all_object_types = objects["ObjectType"].unique()
+    #
+    # # Define the threshold value for the analysis
+    # threshold_value = 70.0
+    #
+    # validator = dv.DataValidator()
+    #
+    # df_without_duplicates = validator.remove_duplicates_by_id(result)
+    #
+    # print("tester check. df_without_duplicates")
+    # Tester.check_values_in_dataframe(df_without_duplicates)
+    #
+    # result_with_tech_info_df = dc.DataComposer.enrich_results_with_technical_info(df_without_duplicates,
+    #                                                                               user_profiles)
+    #
+    # result_with_sessions_create_time_df = \
+    #     dc.DataComposer.enrich_results_with_sessions_create_time(result_with_tech_info_df, sessions_df)
+    #
+    # results_with_screening_test_df = \
+    #     dc.DataComposer.enrich_results_with_screening_test_info(result_with_sessions_create_time_df, screening_tests_df)
+    #
+    # results_with_with_edishnal_info_df = (
+    #     dc.DataComposer.enrich_results_with_additional_info(results_with_screening_test_df,
+    #                                                         pupil_users,
+    #                                                         school_class))
+    #
+    # # Analyze each object type and write the results to html
+    # #for object_type in all_object_types:
+    # #    ra.ResultAnalyzer.analyze_and_write_results(object_type, threshold_value,
+    # #                                                dataframes['_Objects__202307211518.csv'],
+    # #                                                results_with_with_education_df, html_output)
+    #
+    # school_class_df = school_class
+    # pupil_user_df = pupil_users
+    # objects_df = objects
+    #
+    # sc_enriched_result = dc.DataComposer.enrich_results_with_school_info(results_with_with_edishnal_info_df,
+    #                                                                      pupil_user_df,
+    #                                                                      school_class_df,
+    #                                                                      school_df)
+    #
+    # profile_df = user_profiles
+    #
+    # enriched_result = dc.DataComposer.enrich_results_with_municipality_info(sc_enriched_result, profile_df,
+    #                                                                         municipalities_df)
+    #
+    # enrich_results_with_is_deleted = dc.DataComposer.enrich_results_with_is_deleted(enriched_result, profile_df)
+    #
+    # # results_with_with_education_df = dc.DataComposer.enrich_results_with_education(enrich_results_with_is_deleted,
+    # #                                                                                user_answers)
+    #
+    # enriched_and_filtered_result = dc.DataComposer.filter_test_info(enrich_results_with_is_deleted,
+    #                                                                 reg_config.folder_name,
+    #                                                                 test_municipalities,
+    #                                                                 test_schools)
+    #
+    # print("tester check. enriched_and_filtered_result")
+    # Tester.check_values_in_dataframe(df_without_duplicates)
+    #
+    # dc.DataComposer.create_excel_from_dataframe(enriched_and_filtered_result, reg_config)
+    #
+    # composed_data = dc.DataComposer.compose_by_municipality_and_school(enriched_result)
+    # ra.ResultAnalyzer.analyze_composed_data(composed_data, threshold_value, objects_df, reg_config.folder_name)
 
 # Function to analyze a specific object type and write the results to html
 def analyze_and_write_results(object_type, threshold_value, objects, result, html_output):

@@ -5,6 +5,10 @@ from typing import List
 import os
 import openpyxl
 import xlsxwriter
+from src.configurations.configuration import Configuration
+from src.configurations.regional_configuration import RegionalConfiguration
+from src.formatters.data_frame_formatter import DataFrameFormatter
+from src.formatters.data_frame_translator import DataFrameTranslator
 
 from tqdm import tqdm
 
@@ -28,19 +32,16 @@ class DataComposer:
         - pd.DataFrame: Отфильтрованный DataFrame с последними результатами.
         """
 
-        # Создаем tqdm объект для отслеживания прогресса
-        tqdm.pandas(desc="Filtering latest results")
-
-
-
+        # Преобразовываем колонку SessionCreatedDate в формат даты
         df['SessionCreatedDate'] = pd.to_datetime(df['SessionCreatedDate'])
 
-        # Группируем данные с помощью tqdm и находим индекс строки с самой поздней датой SessionCreatedDate для каждой комбинации
-        idx = df.groupby(['UserId', 'Name', 'ScreeningTestName', 'VariantName'])[
-            'SessionCreatedDate'].progress_apply(lambda x: x.idxmax())
+        # Группировка данных по указанным столбцам и выбор SessionId последней сессии для каждой группы
+        latest_sessions = df.groupby(['UserId', 'ScreeningTestId', 'VariantId']).apply(
+            lambda group: group[group['SessionCreatedDate'] == group['SessionCreatedDate'].max()]['SessionId'].iloc[0]
+        )
 
-        # Используем индексы, чтобы отфильтровать исходный DataFrame
-        latest_results = df.loc[idx.values]
+        # Отбираем только строки, соответствующие последним сессиям
+        latest_results = df[df['SessionId'].isin(latest_sessions.values)]
 
         return latest_results
 
@@ -99,7 +100,7 @@ class DataComposer:
         initial_selection = df.head(60000)
 
         # Шаг 2: Найти все записи с теми же значениями UserHrid и Name
-        unique_users_and_names = initial_selection[['UserHrid', 'Name']].drop_duplicates()
+        unique_users_and_names = initial_selection[['UserHrid', 'ObjectType', 'Name']].drop_duplicates()
 
         extended_selection = pd.merge(unique_users_and_names, df, on=['UserHrid', 'Name'], how='left')
 
@@ -109,37 +110,13 @@ class DataComposer:
         return test_data
 
     @staticmethod
-    def preprocess_data(df: pd.DataFrame, tests_to_sum=None, isTest=False, technical_information=False) -> pd.DataFrame:
-        options = {
-        'is_test' : False,
-        'is_choice_tests': True,
-        'is_filter_tests': False,
-        'is_filter_Objects' : False,
-        'is_choice_Objects' : True,
-        'top_n_rows' : True,
-        'is_technical_information' : False,
-        'is_last_results' : True,
-        'is_separate_relults' : False,
-        'delete is_delete' : True,
-        'delete SchoolIsDeleted' : True
-        }
+    def preprocess_data(df: pd.DataFrame, config : Configuration) -> pd.DataFrame:
 
-        pskovskaya_oblast = {"Тест на способности для Псковской области",
-                             "Тест на интересы для Псковской области",
-                             "Тест для Псковской области"}
-
-        yanao = {"Тест на способности для ЯНАО",
-                 "Тест на интересы для ЯНАО",
-                 "Тест для ЯНАО"}
-
-        choice_tests = pskovskaya_oblast
-
-
-        filter_tests = {}
-        filter_Objects = {}
-        choice_Objects = {"FieldDO"} #SPO_VO FieldDO
-        filter_top = 0
-
+        print(config.options.keys())
+        options = config.options
+        filter_Objects = config.filter_Objects
+        choice_Objects = config.choice_Objects
+        choice_tests = config.choice_tests
 
 
 
@@ -156,7 +133,7 @@ class DataComposer:
         - pd.DataFrame: Обработанный DataFrame.
         """
 
-        if options['delete is_delete']:
+        if options['delete_is_delete']:
             print("delete is_delete = True")
             print('before ', df.shape[0])
             df = df[df['IsDeleted'] == False]
@@ -165,7 +142,7 @@ class DataComposer:
         print("tester check. delete is_delete")
         Tester.check_values_in_dataframe(df)
 
-        if options['delete SchoolIsDeleted']:
+        if options['delete_SchoolIsDeleted']:
             print("delete SchoolIsDeleted = True")
             print('before ', df.shape[0])
             df = df[df['SchoolIsDeleted'] == False]
@@ -229,7 +206,7 @@ class DataComposer:
             print("tester check. 'is_last_results'")
             Tester.check_values_in_dataframe(df)
 
-        return df, options
+        return df
 
     @staticmethod
     def save_unique_counts_to_csv(unique_counts: pd.Series, folder_path: str) -> None:
@@ -285,35 +262,59 @@ class DataComposer:
 
 
     @staticmethod
-    def create_excel_from_dataframe(df, output_folder, tests_to_sum=None):
+    def create_excel_from_dataframe(df, config: Configuration):
         print("Количество групп")
         print(df.shape[0])
 
-        #equivalent = "Тест для ЯНАО_Стандартный вариант для всех"
-        alternate_sum = "Тест для Псковской области_Стандартный вариант для всех"
 
-        df, options = DataComposer.preprocess_data(df, tests_to_sum=tests_to_sum, isTest=False)
-        print(options)
+
+        df = DataComposer.preprocess_data(df, config)
+
         print("Количество групп")
         print(df.shape[0])
-        if options['is_separate_relults']:
+        if config.options['is_separate_results']:
+            # Счетчик для файлов с одинаковыми названиями
+            file_name_counter = {}
 
-            unique_user_counts, grouped_dfs = DataComposer.process_dataframe(df)
-            DataComposer.save_unique_counts_to_csv(unique_user_counts, output_folder)
-            legend = {name: i for i, name in enumerate(grouped_dfs.keys(), 1)}
+            # Группируем датафрейм по уникальным комбинациям ScreeningTestId и VariantId
+            grouped = df.groupby(['ScreeningTestId', 'VariantId'])
 
-            for test_variant, group_df in grouped_dfs.items():
-                # Используем номер комбинации из легенды для имени файла
-                file_name = f"combo_{legend[test_variant]}"
-                DataComposer.create_excel_from_prepared_dataframe(group_df, output_folder, file_name, tests_to_sum,
-                                                                  alternate_sum=alternate_sum, options=options)
+            for (test_id, variant_id), group in grouped:
+                test_name = group['ScreeningTestName'].iloc[0][:30]  # первые 30 символов
+                variant_name = group['VariantName'].iloc[0][:30]  # первые 30 символов
+                file_name_base = f"{test_name}_{variant_name}"
+
+                # Учтем возможность совпадения имен файлов
+                file_name_counter[file_name_base] = file_name_counter.get(file_name_base, 0) + 1
+                file_name = f"{file_name_base}_{file_name_counter[file_name_base]}"
+
+                DataComposer.create_excel_from_prepared_dataframe(group, config, file_name)
+        # if config.options['is_separate_results']:
+        #
+        #     unique_user_counts, grouped_dfs = DataComposer.process_dataframe(df)
+        #     DataComposer.save_unique_counts_to_csv(unique_user_counts, config)
+        #     legend = {name: i for i, name in enumerate(grouped_dfs.keys(), 1)}
+        #
+        #     for test_variant, group_df in grouped_dfs.items():
+        #         # Используем номер комбинации из легенды для имени файла
+        #         file_name = f"combo_{legend[test_variant]}"
+        #         DataComposer.create_excel_from_prepared_dataframe(group_df, config, file_name)
 
         else:
-            DataComposer.create_excel_from_prepared_dataframe(df, output_folder, 'result_out', tests_to_sum,
-                                                              alternate_sum=alternate_sum,
-                                                              options=options)
+            DataComposer.create_excel_from_prepared_dataframe(df, config, 'result_out')
     @staticmethod
-    def create_excel_from_prepared_dataframe(df, output_folder, file_name, tests_to_sum=None, alternate_sum=None, equivalent=None, options=None):
+    def create_excel_from_prepared_dataframe(df, config : Configuration, file_name):
+        #file_name, tests_to_sum=None, alternate_sum=None, equivalent=None, options=None):
+
+        regional_config = config.regional_config #RegionalConfiguration()
+
+        output_folder = regional_config.folder_name
+        tests_to_sum = regional_config.tests_to_sum
+        alternate_sum = regional_config.alternate_sum
+        with_education = config.options['with_education']
+
+        equivalent = None
+        options = config.options
 
         print("Количество групп")
         print(df.shape[0])
@@ -363,7 +364,7 @@ class DataComposer:
                 data = {
                     'UserHrid': group['UserHrid'].iloc[0],
                     'PupilId': group['PupilId'].iloc[0],
-                    'Name_Object': group['Name'].iloc[0],
+                    'Name': group['Name'].iloc[0],
                     'ClassName': group['ClassName'].iloc[0],
                     'ObjectType': group['ObjectType'].iloc[0],
                     'SchoolName': group['SchoolName'].iloc[0],
@@ -382,7 +383,7 @@ class DataComposer:
 
         # Группировка по UserHrid, 'ObjectType' и Name_Object
         grouped = df.groupby(['UserHrid', 'ObjectType', 'Name'])
-        print("Группировка по UserHrid, 'ObjectType' и Name_Object")
+        print("Группировка по UserHrid, 'ObjectType' и Name")
         print(grouped.head(10))
         counter = 0
         result_data = []
@@ -412,11 +413,11 @@ class DataComposer:
                 return "Ошибка: отсутствуют необходимые столбцы в датафрейме."
 
             # Фильтрация результирующего датафрейма по значениям Hrid и Name_Object
-            filtered_df = df[df['UserHrid'].isin(hrids_to_check) & df['Name_Object'].isin(names_to_check)]
+            filtered_df = df[df['UserHrid'].isin(hrids_to_check) & df['Name'].isin(names_to_check)]
 
             # Вывод результатов
             if not filtered_df.empty:
-                return "Найдены следующие строки:\n", filtered_df[['UserHrid', 'Name_Object']]
+                return "Найдены следующие строки:\n", filtered_df[['UserHrid', 'Name']]
             else:
                 return "Строки не найдены."
 
@@ -581,9 +582,9 @@ class DataComposer:
                 result_df[sum_test_name + '_MaxValue'] = sum_max_values
                 print(sum_transformed_values)
         test_values = [
-            {'UserId': '699e018f-2cb4-4116-98ef-280a5b371c00', 'Object_Name': "Спорт"},
-            {'UserId': 'c657d17e-d23a-4f46-8199-ed966bb8f310', 'Object_Name': "Красота и мода"},
-            {'UserId': '15efcfe0-5842-4ffd-8a9a-2fd098fb3250', 'Object_Name': "Спорт"}
+            {'UserId': '699e018f-2cb4-4116-98ef-280a5b371c00', 'Name': "Спорт"},
+            {'UserId': 'c657d17e-d23a-4f46-8199-ed966bb8f310', 'Name': "Красота и мода"},
+            {'UserId': '15efcfe0-5842-4ffd-8a9a-2fd098fb3250', 'Name': "Спорт"}
         ]
 
         print("tester check. sum tests")
@@ -670,18 +671,24 @@ class DataComposer:
                 return str_value
 
             # # Определяем словарь для маппинга на основе Name_Object
-            # if row['Name_Object'] == 'SPO_VO':
-            #     return education_map_inverse.get(value, str_value)
-            # elif row['Name_Object'] == 'Направление образования':
-            #     return direction_map_inverse.get(value, str_value)
-            # return str_value
+            if row['Name'] == 'SPO_VO':
+                return education_map_inverse.get(value, str_value)
+            elif row['Name'] == 'Направление образования':
+                return direction_map_inverse.get(value, str_value)
+            return str_value
 
             # Применяем функцию replace_value к каждой строке датафрейма
 
-        # for test_pair in tests_to_sum:
-        #     transformed_column_name = "Сумма " + " и ".join(test_pair) + '_TransformedValue'
-        #     if transformed_column_name in result_df.columns:
-        #         result_df[transformed_column_name] = result_df.apply(replace_value, axis=1)
+        if with_education:
+            mask = result_df['ObjectType'] == 'SPO_VO'
+            for test_pair in tests_to_sum:
+                transformed_column_name = "Сумма " + " и ".join(test_pair) + '_TransformedValue'
+                if transformed_column_name in result_df.columns:
+                    result_df.loc[mask, transformed_column_name] = result_df[mask].apply(replace_value, axis=1)
+
+        DataFrameFormatter.format_dataframe(result_df, config.format_options)
+        if options['translate']:
+            DataFrameTranslator.translate(result_df)
 
         print("Формирование файла Excel...")
 
@@ -690,7 +697,14 @@ class DataComposer:
             os.makedirs(output_folder)
 
         # Сортировка result_df по UserId и ObjectType
-        result_df = result_df.sort_values(by=['UserHrid', 'ObjectType'])
+        if options['translate']:
+            user_hrid_localisation_column_name = "Итентификатор_пользователя"
+            object_type_localisation_name =  "Агрегатор"
+        else:
+            user_hrid_localisation_column_name = "UserHrid"
+            object_type_localisation_name = "ObjectType"
+
+        result_df = result_df.sort_values(by=[user_hrid_localisation_column_name, object_type_localisation_name])
 
         def top_n_rows(group, n=3):
             column_name = "Сумма Тест на способности для Псковской области_Стандартный вариант для всех и Тест на интересы для Псковской области_Стандартный вариант для всех_TransformedValue"
@@ -719,16 +733,16 @@ class DataComposer:
             return top_rows
 
         if options['top_n_rows']:
-            result_df = result_df.groupby('UserHrid').apply(top_n_rows).reset_index(drop=True)
+            result_df = result_df.groupby(user_hrid_localisation_column_name).apply(top_n_rows).reset_index(drop=True)
 
         # Получите уникальные значения ObjectType
-        unique_object_types = result_df['ObjectType'].unique()
+        unique_object_types = result_df[object_type_localisation_name].unique()
 
         split_size = 1_000_000  # Размер каждого разделенного датафрейма
 
         with pd.ExcelWriter(f"{output_folder}/, {file_name}.xlsx", engine='xlsxwriter') as writer:
             for obj_type in unique_object_types:
-                sub_df = result_df[result_df['ObjectType'] == obj_type]
+                sub_df = result_df[result_df[object_type_localisation_name] == obj_type]
 
                 num_splits = len(sub_df) // split_size + (1 if len(sub_df) % split_size else 0)
 
@@ -1131,6 +1145,8 @@ class DataComposer:
 
         unique_municipalities = enriched_result['MunicipalityName'].unique()
         print("Enriched munic list:", unique_municipalities)
+        unique_schools = enriched_result['SchoolName'].unique()
+        print("Enriched school list:", unique_schools)
 
         filtered_df = enriched_result[~enriched_result['SchoolName'].isin(tested_school)]
         filtered_df = filtered_df[~filtered_df['MunicipalityName'].isin(tested_municipality)]
