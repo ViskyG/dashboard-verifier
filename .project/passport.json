@@ -1,0 +1,27 @@
+{
+  "schema": "project-passport/1",
+  "id": "career-dashboard-verifier",
+  "name": "Проверка профориентационного дашборда",
+  "summary": "Инструмент анализа данных школьников на платформе профориентации: собирает таблицы профилей и диагностик, устраняет повторы, считает распределения результатов и доли пользователей выше порога, формирует HTML-сводки по муниципалитетам и школам.",
+  "kind": "data",
+  "workflow": {
+    "profile": "standard"
+  },
+  "repositories": [
+    {
+      "role": "primary",
+      "url": "https://github.com/ViskyG/dashboard-verifier"
+    }
+  ],
+  "tags": [
+    "career-guidance",
+    "data-quality",
+    "python",
+    "pandas",
+    "html-reports"
+  ],
+  "references": {
+    "source_1": "src/main.py",
+    "source_2": "src/analysis/result_analyzer.py"
+  }
+}
